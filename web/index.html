@@ -119,14 +119,14 @@
     padding: 8px 16px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 100; }
   #toast.show { opacity: 1; }
   /* 锁屏 */
-  #lock, #login { position: fixed; inset: 0; background: var(--bg); z-index: 200;
+  #lock, #login, #config { position: fixed; inset: 0; background: var(--bg); z-index: 200;
     display: flex; align-items: center; justify-content: center; padding: 20px; }
-  #login { z-index: 210; }
-  #lock .box, #login .box { width: 100%; max-width: 360px; }
-  #lock h2, #login h2 { font-size: 16px; margin-bottom: 6px; }
-  #lock .lead, #login .lead { font-size: 12px; color: var(--ink-dim); line-height: 1.7; margin-bottom: 20px; }
+  #login, #config { z-index: 210; }
+  #lock .box, #login .box, #config .box { width: 100%; max-width: 360px; }
+  #lock h2, #login h2, #config h2 { font-size: 16px; margin-bottom: 6px; }
+  #lock .lead, #login .lead, #config .lead { font-size: 12px; color: var(--ink-dim); line-height: 1.7; margin-bottom: 20px; }
   #lock .warn { font-size: 11px; color: var(--danger); margin-top: 12px; line-height: 1.6; }
-  #lock #lockErr, #login #loginErr { font-size: 12px; color: var(--danger); margin-top: 10px; min-height: 16px; }
+  #lock #lockErr, #login #loginErr, #config #cfgErr { font-size: 12px; color: var(--danger); margin-top: 10px; min-height: 16px; }
   @media (max-width: 760px) {
     main { flex-direction: column; overflow-y: auto; }
     .column { min-height: 200px; }
@@ -141,6 +141,19 @@
 </script>
 </head>
 <body>
+<div id="config" style="display:none">
+  <div class="box">
+    <h2>账号图谱<span style="color:var(--accent)">.</span> 配置</h2>
+    <div class="lead">填入你自己的 Supabase 项目地址和 publishable key（各连各的库）。首次部署需先在 Supabase 跑建库脚本，见 README。</div>
+    <label>Supabase URL</label>
+    <input type="text" id="cfgUrl" placeholder="https://xxxx.supabase.co">
+    <label>Publishable Key</label>
+    <input type="text" id="cfgKey" placeholder="sb_publishable_...">
+    <div class="btn-row"><button class="primary" id="cfgSave">保存并连接</button></div>
+    <div id="cfgErr"></div>
+  </div>
+</div>
+
 <div id="login" style="display:none">
   <div class="box">
     <h2>账号图谱<span style="color:var(--accent)">.</span> 登录</h2>
@@ -207,8 +220,11 @@
 
 <script type="module">
 // ============ 配置 ============
-const SUPABASE_URL = 'https://bpirywiujdxtxjwkfapi.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_Zqh_O6qPXdoGMFgwXMPpgQ_gtnEB-WO';
+// 默认 Supabase（作配置界面预填）；使用者可改成自己的，存 localStorage，各连各的库
+const DEFAULT_URL = 'https://bpirywiujdxtxjwkfapi.supabase.co';
+const DEFAULT_KEY = 'sb_publishable_Zqh_O6qPXdoGMFgwXMPpgQ_gtnEB-WO';
+const SB_CFG_KEY = 'ag_supabase_cfg';
+function getSbCfg() { try { return JSON.parse(localStorage.getItem(SB_CFG_KEY)) || null; } catch { return null; } }
 const ITER = 600000;
 const SESS_KEY = 'ag_masterkey';
 const CANARY_PLAIN = 'account-graph-canary-v1';
@@ -226,7 +242,13 @@ if (!createClient) {
   connState.innerHTML = '<b class="off">SDK 加载失败</b>';
   document.getElementById('lockErr').textContent = 'supabase-js 加载失败：检查网络';
 }
-const supabase = createClient ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+let supabase = null;
+function initSupabase() {
+  const cfg = getSbCfg();
+  if (!createClient || !cfg || !cfg.url || !cfg.key) return false;
+  supabase = createClient(cfg.url, cfg.key);
+  return true;
+}
 
 // ============ 加密（沿用 v3：全局 salt + 缓存 master key，v2:iv:ct） ============
 const tenc = new TextEncoder(), tdec = new TextDecoder();
@@ -399,12 +421,15 @@ function renderCard(a) {
     <div class="meta">
       ${showCountryPhone2fa && a.phone ? `<b>手机</b> ${esc(a.phone)} ${a.twofa_enabled ? '<span class="twofa-on">· 2FA✓</span>' : ''}<br>`
         : (showCountryPhone2fa && a.twofa_enabled ? '<span class="twofa-on">2FA✓</span><br>' : '')}
+      ${a.recovery_email ? `<b>辅邮</b> ${esc(a.recovery_email)}<br>` : ''}
       ${a.encrypted_password ? '<span class="haspw"><b>密码</b> 已加密 ✓</span><br>' : '<span style="opacity:.6">无密码</span><br>'}
+      ${a.encrypted_2fa ? '<span class="haspw"><b>2FA密钥</b> 已加密 ✓</span><br>' : ''}
       ${rel}
     </div>
     <div class="quick">
       <button class="mini" data-cp-email="${a.id}">复制邮箱</button>
       <button class="mini" data-cp-pass="${a.id}" ${a.encrypted_password ? '' : 'disabled'}>复制密码</button>
+      ${a.encrypted_2fa ? `<button class="mini" data-cp-2fa="${a.id}">复制2FA</button>` : ''}
     </div>`;
 
   card.querySelector('[data-edit]').onclick = () => openForm(a);
@@ -419,6 +444,11 @@ function renderCard(a) {
   card.querySelector('[data-cp-pass]').onclick = async () => {
     if (!a.encrypted_password) return toast('未设置密码');
     try { await copyEphemeral(await decryptPw(a.encrypted_password), '密码'); }
+    catch { toast('解密失败(主密码不一致?)'); }
+  };
+  const cp2fa = card.querySelector('[data-cp-2fa]');
+  if (cp2fa) cp2fa.onclick = async () => {
+    try { await copyEphemeral(await decryptPw(a.encrypted_2fa), '2FA密钥'); }
     catch { toast('解密失败(主密码不一致?)'); }
   };
   return card;
@@ -470,9 +500,16 @@ function openForm(a) {
       <input id="f-phone" value="${esc(a.phone || '')}" placeholder="+86 138 0000 0000">
       <label>国家 / 地区</label>
       <select id="f-country">${countryOptions(a.country_id)}</select>
+      <label>辅助邮箱</label>
+      <input id="f-recovery" value="${esc(a.recovery_email || '')}" placeholder="recovery@example.com">
       <div class="toggle-row">
         <input type="checkbox" id="f-2fa" ${a.twofa_enabled ? 'checked' : ''}>
         <label for="f-2fa">已开启 2FA 两步验证</label>
+      </div>
+      <label>2FA 密钥 / TOTP 种子（本地加密后存云）</label>
+      <div class="pw-row">
+        <input id="f-2fakey" type="password" placeholder="${a.encrypted_2fa ? '已加密 · 留空=清除' : '密钥串'}">
+        <button class="mini ghost" id="f-2fakey-show" type="button">显示</button>
       </div>
     </div>
 
@@ -488,7 +525,7 @@ function openForm(a) {
 
     <label>密码（本地加密后存云）</label>
     <div class="pw-row">
-      <input id="f-pw" type="password" placeholder="${a.encrypted_password ? '已加密 · 留空则不修改' : '输入密码'}">
+      <input id="f-pw" type="password" placeholder="${a.encrypted_password ? '已加密 · 留空=清除' : '输入密码'}">
       <button class="mini ghost" id="f-pw-show" type="button">显示</button>
     </div>
     <div class="hint">明文密码,保存时用主密码加密,云端只存密文。</div>
@@ -512,13 +549,21 @@ function openForm(a) {
   platSel.onchange = applyCat;
   applyCat();
 
-  // 已有密码:解密填入
+  // 已有密码 / 2FA 密钥:解密填入。_loaded 标记区分「已加载后清空(=清除)」与「解密失败的空(=保留)」
+  a._pwLoaded = !a.encrypted_password;
+  a._faLoaded = !a.encrypted_2fa;
   if (a.encrypted_password) {
-    decryptPw(a.encrypted_password).then(pw => { body.querySelector('#f-pw').value = pw; })
-      .catch(() => { body.querySelector('#f-pw').placeholder = '解密失败(主密码不一致?)'; });
+    decryptPw(a.encrypted_password).then(pw => { body.querySelector('#f-pw').value = pw; a._pwLoaded = true; })
+      .catch(() => { body.querySelector('#f-pw').placeholder = '解密失败(主密码不一致?)'; a._pwLoaded = false; });
+  }
+  if (a.encrypted_2fa) {
+    decryptPw(a.encrypted_2fa).then(s => { const el = body.querySelector('#f-2fakey'); if (el) el.value = s; a._faLoaded = true; })
+      .catch(() => { a._faLoaded = false; });
   }
   const pwInput = body.querySelector('#f-pw');
   body.querySelector('#f-pw-show').onclick = () => { pwInput.type = pwInput.type === 'password' ? 'text' : 'password'; };
+  const k2btn = body.querySelector('#f-2fakey-show');
+  if (k2btn) k2btn.onclick = () => { const el = body.querySelector('#f-2fakey'); el.type = el.type === 'password' ? 'text' : 'password'; };
 
   body.querySelector('#f-save').onclick = () => saveAccount(a, isNew);
   const del = body.querySelector('#f-del');
@@ -546,16 +591,26 @@ async function saveAccount(a, isNew) {
     row.phone = body.querySelector('#f-phone').value.trim() || null;
     row.country_id = body.querySelector('#f-country').value || null;
     row.twofa_enabled = body.querySelector('#f-2fa').checked;
+    row.recovery_email = body.querySelector('#f-recovery').value.trim() || null;
   } else {
-    row.phone = null; row.country_id = null; row.twofa_enabled = false;
+    row.phone = null; row.country_id = null; row.twofa_enabled = false; row.recovery_email = null;
   }
   row.register_email_id = (cat === 'apple' || cat === 'ai') ? (body.querySelector('#f-register').value || null) : null;
   row.subscribe_apple_id = (cat === 'ai') ? (body.querySelector('#f-subscribe').value || null) : null;
 
+  // 框值即存值：填了=加密存；清空=清除(null)。解密失败(_loaded=false)的空则保留原密文，防误清
   const pwVal = body.querySelector('#f-pw').value;
   if (pwVal) row.encrypted_password = await encryptPw(pwVal);
-  else if (!isNew) row.encrypted_password = a.encrypted_password;
-  else row.encrypted_password = null;
+  else row.encrypted_password = a._pwLoaded ? null : a.encrypted_password;
+
+  // 2FA 密钥（email/apple 才有）
+  if (cat === 'email' || cat === 'apple') {
+    const k = body.querySelector('#f-2fakey').value;
+    if (k) row.encrypted_2fa = await encryptPw(k);
+    else row.encrypted_2fa = a._faLoaded ? null : a.encrypted_2fa;
+  } else {
+    row.encrypted_2fa = null;
+  }
 
   let error;
   if (isNew) ({ error } = await supabase.from('accounts').insert(row));
@@ -626,7 +681,14 @@ function renderSettings() {
     <input type="password" id="newMpw1" placeholder="新主密码" style="margin-top:6px">
     <input type="password" id="newMpw2" placeholder="再次输入新主密码" style="margin-top:6px">
     <div class="btn-row"><button id="changeMpw">更改并重新加密全部</button></div>
-    <div class="hint">会用新密码重新加密所有条目（事务原子，失败不损坏）。建议先「导出」备份。</div>`;
+    <div class="hint">会用新密码重新加密所有条目（事务原子，失败不损坏）。建议先「导出」备份。</div>
+    <label>批量导入（粘贴 JSON）</label>
+    <textarea id="importJson" placeholder='[{"platform":"Gmail","name":"x@gmail.com","password":"...","recovery_email":"...","twofa_secret":"...","phone":"...","twofa_enabled":true}]' style="min-height:90px"></textarea>
+    <div class="btn-row"><button id="importBtn">解析并导入</button></div>
+    <div class="hint" id="importMsg">password 和 2FA 密钥在本地加密后入库。platform 必须是已有平台名。</div>
+    <label>Supabase 连接</label>
+    <div class="btn-row"><button id="reconfigBtn" class="ghost">重新配置（切换库）</button></div>
+    <div class="hint">改连接会重载页面。</div>`;
 
   const body = document.getElementById('sdrawerBody');
   body.innerHTML = html;
@@ -636,6 +698,8 @@ function renderSettings() {
   body.querySelector('#addPlat').onclick = addPlatform;
   body.querySelector('#addCtry').onclick = addCountry;
   body.querySelector('#changeMpw').onclick = doChangeMasterPassword;
+  body.querySelector('#importBtn').onclick = doBatchImport;
+  body.querySelector('#reconfigBtn').onclick = () => { sdrawer.classList.remove('open'); showConfig(); };
 }
 
 async function addPlatform() {
@@ -717,6 +781,40 @@ async function changeMasterPassword(newPw) {
   sessionStorage.setItem(SESS_KEY, b64(await crypto.subtle.exportKey('raw', newKey)));
   await loadAll();
 }
+
+// ---- 批量导入（客户端加密 password + 2FA 密钥）----
+async function doBatchImport() {
+  const raw = document.getElementById('importJson').value.trim();
+  const msg = document.getElementById('importMsg');
+  if (!raw) return toast('请粘贴 JSON');
+  let arr;
+  try { arr = JSON.parse(raw); if (!Array.isArray(arr)) throw 0; }
+  catch { msg.textContent = 'JSON 解析失败'; return toast('JSON 格式错误'); }
+  const btn = document.getElementById('importBtn');
+  btn.disabled = true; btn.textContent = '导入中…';
+  let ok = 0, fail = 0; const errs = [];
+  for (const item of arr) {
+    try {
+      const plat = state.platforms.find(p => p.name === item.platform);
+      if (!plat) { fail++; errs.push(`${item.name || '?'}: 平台「${item.platform}」不存在`); continue; }
+      const ctry = item.country ? state.countries.find(c => c.name === item.country) : null;
+      const row = {
+        category: plat.category, platform_id: plat.id, name: item.name,
+        phone: item.phone || null, twofa_enabled: !!item.twofa_enabled,
+        recovery_email: item.recovery_email || null,
+        country_id: ctry ? ctry.id : null, note: item.note || null,
+        encrypted_password: item.password ? await encryptPw(item.password) : null,
+        encrypted_2fa: item.twofa_secret ? await encryptPw(item.twofa_secret) : null,
+      };
+      const { error } = await supabase.from('accounts').insert(row);
+      if (error) { fail++; errs.push(`${item.name}: ${error.message}`); } else { ok++; }
+    } catch (e) { fail++; errs.push(`${item.name || '?'}: ${e.message || e}`); }
+  }
+  btn.disabled = false; btn.textContent = '解析并导入';
+  msg.textContent = `成功 ${ok}，失败 ${fail}` + (errs.length ? ' — ' + errs.join('; ') : '');
+  await loadAll();
+  toast(`导入：成功 ${ok}，失败 ${fail}`);
+}
 document.getElementById('export').onclick = () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -777,8 +875,26 @@ document.getElementById('logout').onclick = async () => {
   location.reload();
 };
 
+// ---- Supabase 配置（可配置：各连各的库）----
+function showConfig() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('lock').style.display = 'none';
+  const cfg = getSbCfg() || {};
+  document.getElementById('cfgUrl').value = cfg.url || DEFAULT_URL;
+  document.getElementById('cfgKey').value = cfg.key || DEFAULT_KEY;
+  document.getElementById('config').style.display = 'flex';
+}
+document.getElementById('cfgSave').onclick = () => {
+  const url = document.getElementById('cfgUrl').value.trim();
+  const key = document.getElementById('cfgKey').value.trim();
+  if (!url || !key) { document.getElementById('cfgErr').textContent = 'URL 和 Key 都要填'; return; }
+  localStorage.setItem(SB_CFG_KEY, JSON.stringify({ url, key }));
+  location.reload();
+};
+
 (async () => {
-  if (!supabase) return;
+  if (!createClient) return;                       // SDK 加载失败
+  if (!initSupabase()) { showConfig(); return; }   // 无配置 → 配置界面
   const { data } = await supabase.auth.getSession();
   if (data.session) await enterMasterPasswordGate();
   else showLogin();
