@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cryptography_flutter/cryptography_flutter.dart';
+import 'state/theme_provider.dart';
+import 'ui/theme/app_theme.dart';
+import 'ui/gates/root_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,14 +15,17 @@ void main() async {
   runApp(const ProviderScope(child: AccountGraphApp()));
 }
 
-class AccountGraphApp extends StatelessWidget {
+class AccountGraphApp extends ConsumerWidget {
   const AccountGraphApp({super.key});
   @override
-  Widget build(BuildContext context) {
-    // 主题与 root 在 Phase 5/6 接入；此处先占位可编译
-    return const MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeProvider);
+    return MaterialApp(
       title: '账号图谱',
-      home: Scaffold(body: Center(child: Text('账号图谱'))),
+      themeMode: mode,
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
+      home: const RootGate(),
     );
   }
 }
