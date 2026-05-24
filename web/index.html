@@ -764,13 +764,16 @@ async function doChangeMasterPassword() {
   }
 }
 async function changeMasterPassword(newPw) {
-  const withPw = state.accounts.filter(a => a.encrypted_password);
+  // 密码和 2FA 密钥都要随主密码轮换，否则改密后用新 key 解不开（数据静默损坏）
+  const toRotate = state.accounts.filter(a => a.encrypted_password || a.encrypted_2fa);
   const newSalt = crypto.getRandomValues(new Uint8Array(16));
   const newKey = await deriveKey(newPw, newSalt);   // 新 salt + 新 key
   const updates = [];
-  for (const a of withPw) {
-    const plain = await decryptPw(a.encrypted_password);       // 旧 key（内存）解密
-    updates.push({ id: a.id, ct: await encryptWith(newKey, plain) }); // 新 key 重加密
+  for (const a of toRotate) {                        // 旧 key（内存）解密 → 新 key 重加密
+    const upd = { id: a.id };
+    if (a.encrypted_password) upd.ct = await encryptWith(newKey, await decryptPw(a.encrypted_password));
+    if (a.encrypted_2fa)      upd.fa = await encryptWith(newKey, await decryptPw(a.encrypted_2fa));
+    updates.push(upd);
   }
   const newCanary = await encryptWith(newKey, CANARY_PLAIN);
   const { error } = await supabase.rpc('rotate_master_key', {

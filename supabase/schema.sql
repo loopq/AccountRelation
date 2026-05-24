@@ -63,14 +63,30 @@ insert into public.countries (name, color, sort) values
   ('土耳其',   '#d4a857', 4);
 
 -- ============ 全量重加密事务函数（改主密码用）============
+-- p_updates 每项 {id, ct?, fa?}：ct=密码新密文，fa=2FA 密钥新密文。
+-- 轮换语义：只重加密、永不清除。ct/fa 均用 coalesce，缺省则保留原值。
+-- 这样 ct 与 fa 对称：旧客户端/任意部署顺序都不丢数据，缺字段不会误写 NULL。
+-- p_expected_count（可选，默认 null）：客户端「需轮换账户数」完整性校验。
+--   传入则在事务内比对线上实际带密文账户数，不一致即回滚 —— 防止另一设备并发新增
+--   账户被漏轮换后用新 key 永久解不开。为空时跳过校验（兼容不传该参数的旧 Web 客户端，不破坏现有调用）。
 create or replace function public.rotate_master_key(
-  p_salt text, p_canary text, p_updates jsonb
+  p_salt text, p_canary text, p_updates jsonb, p_expected_count int default null
 ) returns void language plpgsql security invoker set search_path = public as $$
-declare item jsonb;
+declare item jsonb; actual_count int;
 begin
+  if p_expected_count is not null then
+    select count(*) into actual_count from public.accounts
+      where encrypted_password is not null or encrypted_2fa is not null;
+    if actual_count <> p_expected_count then
+      raise exception 'rotate_master_key 完整性校验失败：预期 % 个待轮换账户，实际 % 个（疑似其他设备并发改动），已回滚', p_expected_count, actual_count;
+    end if;
+  end if;
   update public.vault_meta set salt = p_salt, canary = p_canary where id = 1;
   for item in select jsonb_array_elements(p_updates) loop
-    update public.accounts set encrypted_password = item->>'ct', updated_at = now()
+    update public.accounts set
+      encrypted_password = coalesce(item->>'ct', encrypted_password),
+      encrypted_2fa = coalesce(item->>'fa', encrypted_2fa),
+      updated_at = now()
       where id = (item->>'id')::uuid;
   end loop;
 end;
