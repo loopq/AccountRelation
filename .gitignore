@@ -1,0 +1,34 @@
+# ============================================
+# 只推送 web 端应用本体，其余全部忽略
+# ============================================
+
+# 内部文档（plan / review / 预调研 / AI 规则）——不上传
+docs/
+账号图谱-预调研交接.md
+CLAUDE.md
+
+# 开发工具配置（含 Supabase project_ref）
+.mcp.json
+
+# 历史迭代版本 + 一次性验证脚本（非生产）
+web/account-graph-v2.html
+web/account-graph-v3.html
+web/verify-v1-crypto.html
+web/verify-v2-supabase.html
+
+# 系统 / 编辑器 / 临时
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*~
+*.log
+*.tmp
+
+# 本地导出备份（含密文）
+account-graph-backup*.json
+
+# 依赖（将来若引入构建）
+node_modules/
+dist/

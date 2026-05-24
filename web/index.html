@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>账号图谱 v4 · 分类树</title>
+<style>
+  :root {
+    --bg: #0e0f13; --panel: #16181f; --panel-2: #1d2029; --line: #2a2e3a;
+    --ink: #e8e6e0; --ink-dim: #8b8f9c; --accent: #d4a857; --accent-2: #5b8fb0;
+    --danger: #c2554d; --ok: #6fae6a;
+    --cat-email: #5b8fb0; --cat-apple: #d4a857; --cat-ai: #9b7fc4;
+  }
+  [data-theme="light"] {
+    --bg: #f4f4f0; --panel: #ffffff; --panel-2: #eeeee8; --line: #d6d6cc;
+    --ink: #1b1d22; --ink-dim: #6b7280; --accent: #b07d2e; --accent-2: #3d7196;
+    --danger: #b0433b; --ok: #4a8a45;
+    --cat-email: #3d7196; --cat-apple: #b07d2e; --cat-ai: #7a5fa4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    display: flex; flex-direction: column; overflow: hidden; -webkit-text-size-adjust: 100%;
+  }
+  header {
+    padding: 13px 20px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; font-weight: 600; }
+  header h1 .dot { color: var(--accent); }
+  header .sub { font-size: 11px; color: var(--ink-dim); }
+  header .spacer { flex: 1; }
+  #connState { font-size: 10px; color: var(--ink-dim); }
+  #connState b { color: var(--ok); }
+  #connState b.off { color: var(--danger); }
+  button {
+    font-family: inherit; font-size: 11px; background: var(--panel-2); color: var(--ink);
+    border: 1px solid var(--line); padding: 6px 11px; border-radius: 5px;
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 600; }
+  button.ghost { background: transparent; }
+  button.mini { font-size: 10px; padding: 3px 8px; }
+  /* 三等分主区 */
+  main { flex: 1; display: flex; min-height: 0; gap: 1px; background: var(--line); }
+  .column { flex: 1; background: var(--bg); display: flex; flex-direction: column; min-width: 0; }
+  .col-head {
+    padding: 11px 16px; border-bottom: 1px solid var(--line);
+    font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .col-head .count { font-size: 10px; color: var(--ink-dim); font-weight: 400; }
+  .col-head .bar { width: 3px; height: 14px; border-radius: 2px; }
+  .col-body { overflow-y: auto; flex: 1; padding: 10px; }
+  .col-empty { padding: 30px 14px; text-align: center; color: var(--ink-dim); font-size: 11px; line-height: 1.7; }
+  .card {
+    background: var(--panel-2); border: 1px solid var(--line); border-left-width: 3px;
+    border-radius: 6px; padding: 10px 12px; margin-bottom: 9px;
+  }
+  .card:hover { border-color: var(--accent-2); }
+  .card .ctop { display: flex; justify-content: space-between; align-items: flex-start; }
+  .card .plat { font-size: 10px; color: var(--ink-dim); letter-spacing: 0.05em; text-transform: uppercase; }
+  .card .name { font-size: 13px; font-weight: 600; margin-top: 1px; }
+  .card .edit { font-size: 10px; color: var(--ink-dim); cursor: pointer; }
+  .card .edit:hover { color: var(--accent); }
+  .ctag {
+    display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px;
+    border: 1px solid currentColor; margin-top: 7px;
+  }
+  .card .meta { font-size: 11px; color: var(--ink-dim); margin-top: 7px; line-height: 1.7; }
+  .card .meta b { color: var(--ink); font-weight: 500; }
+  .link { color: var(--accent-2); cursor: pointer; }
+  .link:hover { text-decoration: underline; }
+  .twofa-on { color: var(--ok); }
+  .haspw { color: var(--ok); }
+  .quick { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+  .quick button { flex: 1; min-width: 58px; }
+  /* drawer 表单 */
+  #drawer, #sdrawer {
+    position: fixed; top: 0; right: 0; width: 380px; max-width: 100%; height: 100%;
+    background: var(--panel); border-left: 1px solid var(--line); z-index: 50;
+    transform: translateX(100%); transition: transform .2s; display: flex; flex-direction: column;
+  }
+  #drawer.open, #sdrawer.open { transform: translateX(0); }
+  .seg { display: flex; gap: 6px; }
+  .seg button { flex: 1; }
+  .seg button.active { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 600; }
+  .mrow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .mrow .swatch2 { width: 14px; height: 14px; border-radius: 3px; flex: none; }
+  .mrow .mname { flex: 1; }
+  .mrow .mcat { font-size: 10px; color: var(--ink-dim); }
+  .add-row { display: flex; gap: 6px; margin-top: 8px; }
+  .add-row input[type=color] { width: 36px; padding: 2px; flex: none; }
+  .drawer-head { padding: 14px 16px; border-bottom: 1px solid var(--line);
+    font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  .drawer-body { overflow-y: auto; flex: 1; padding: 14px 16px; }
+  label { display: block; font-size: 10px; color: var(--ink-dim); margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+  label:first-child { margin-top: 0; }
+  input, select, textarea {
+    width: 100%; font-family: inherit; font-size: 12px; background: var(--bg); color: var(--ink);
+    border: 1px solid var(--line); padding: 8px 9px; border-radius: 5px;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 56px; }
+  .hint { font-size: 10px; color: var(--ink-dim); margin-top: 4px; line-height: 1.5; }
+  .pw-row { display: flex; gap: 6px; } .pw-row input { flex: 1; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+  .toggle-row input { width: auto; }
+  .toggle-row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--ink); }
+  .btn-row { display: flex; gap: 8px; margin-top: 18px; }
+  .btn-row button { flex: 1; }
+  .hidden { display: none !important; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: #1a1a1a; font-size: 11px; font-weight: 600;
+    padding: 8px 16px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 100; }
+  #toast.show { opacity: 1; }
+  /* 锁屏 */
+  #lock, #login { position: fixed; inset: 0; background: var(--bg); z-index: 200;
+    display: flex; align-items: center; justify-content: center; padding: 20px; }
+  #login { z-index: 210; }
+  #lock .box, #login .box { width: 100%; max-width: 360px; }
+  #lock h2, #login h2 { font-size: 16px; margin-bottom: 6px; }
+  #lock .lead, #login .lead { font-size: 12px; color: var(--ink-dim); line-height: 1.7; margin-bottom: 20px; }
+  #lock .warn { font-size: 11px; color: var(--danger); margin-top: 12px; line-height: 1.6; }
+  #lock #lockErr, #login #loginErr { font-size: 12px; color: var(--danger); margin-top: 10px; min-height: 16px; }
+  @media (max-width: 760px) {
+    main { flex-direction: column; overflow-y: auto; }
+    .column { min-height: 200px; }
+    #drawer, #sdrawer { width: 100%; }
+  }
+</style>
+<script>
+  // 提前应用主题，避免刷新闪烁
+  (function(){var p=localStorage.getItem('ag_theme')||'system';
+    document.documentElement.dataset.theme = p==='system'
+      ? (matchMedia('(prefers-color-scheme: light)').matches?'light':'dark') : p;})();
+</script>
+</head>
+<body>
+<div id="login" style="display:none">
+  <div class="box">
+    <h2>账号图谱<span style="color:var(--accent)">.</span> 登录</h2>
+    <div class="lead">登录以访问你的数据（云端已开行级保护，未登录无权读写）。</div>
+    <label>邮箱</label>
+    <input type="email" id="loginEmail" autocomplete="username">
+    <label>密码</label>
+    <input type="password" id="loginPw" autocomplete="current-password">
+    <div class="btn-row"><button class="primary" id="loginBtn">登录</button></div>
+    <div id="loginErr"></div>
+  </div>
+</div>
+
+<div id="lock">
+  <div class="box">
+    <h2>账号图谱<span style="color:var(--accent)">.</span></h2>
+    <div class="lead" id="lockLead">输入主密码以解锁。</div>
+    <label>主密码 Master Password</label>
+    <input type="password" id="mpw" autocomplete="off" autofocus>
+    <div class="btn-row"><button class="primary" id="unlockBtn">解锁</button></div>
+    <div id="lockErr"></div>
+    <div class="warn" id="lockWarn" style="display:none">⚠️ 首次使用：请牢记这个主密码。它不上传、无法找回，丢失则所有密码永久无法解密。</div>
+  </div>
+</div>
+
+<header>
+  <h1>账号图谱<span class="dot">.</span></h1>
+  <span class="sub">分类树 · v4</span>
+  <span class="spacer"></span>
+  <span id="connState"></span>
+  <button class="primary" id="add">+ 账号</button>
+  <button class="ghost" id="settings">⚙ 设置</button>
+  <button class="ghost" id="lockNow">🔒 锁定</button>
+  <button class="ghost" id="logout">退出登录</button>
+  <button class="ghost" id="export">导出</button>
+  <button class="ghost" id="seed">示例数据</button>
+</header>
+
+<main>
+  <div class="column" data-cat="email">
+    <div class="col-head"><span class="bar" style="background:var(--cat-email)"></span>📧 EMAIL <span class="count" id="count-email"></span></div>
+    <div class="col-body" id="col-email"></div>
+  </div>
+  <div class="column" data-cat="apple">
+    <div class="col-head"><span class="bar" style="background:var(--cat-apple)"></span>🍎 APPLE <span class="count" id="count-apple"></span></div>
+    <div class="col-body" id="col-apple"></div>
+  </div>
+  <div class="column" data-cat="ai">
+    <div class="col-head"><span class="bar" style="background:var(--cat-ai)"></span>🤖 AI 工具 <span class="count" id="count-ai"></span></div>
+    <div class="col-body" id="col-ai"></div>
+  </div>
+</main>
+
+<div id="drawer">
+  <div class="drawer-head"><span id="drawerTitle">新增账号</span><button class="ghost mini" id="drawerClose">✕</button></div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
+<div id="sdrawer">
+  <div class="drawer-head"><span>⚙ 设置</span><button class="ghost mini" id="sdrawerClose">✕</button></div>
+  <div class="drawer-body" id="sdrawerBody"></div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+// ============ 配置 ============
+const SUPABASE_URL = 'https://bpirywiujdxtxjwkfapi.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Zqh_O6qPXdoGMFgwXMPpgQ_gtnEB-WO';
+const ITER = 600000;
+const SESS_KEY = 'ag_masterkey';
+const CANARY_PLAIN = 'account-graph-canary-v1';
+const CAT_LABEL = { email: '📧 Email', apple: '🍎 Apple', ai: '🤖 AI 工具' };
+const CAT_COLOR = { email: 'var(--cat-email)', apple: 'var(--cat-apple)', ai: 'var(--cat-ai)' };
+
+// ============ 加载 supabase-js ============
+const connState = document.getElementById('connState');
+let createClient;
+for (const cdn of ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm',
+                   'https://esm.sh/@supabase/supabase-js@2']) {
+  try { ({ createClient } = await import(cdn)); break; } catch (e) {}
+}
+if (!createClient) {
+  connState.innerHTML = '<b class="off">SDK 加载失败</b>';
+  document.getElementById('lockErr').textContent = 'supabase-js 加载失败：检查网络';
+}
+const supabase = createClient ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+
+// ============ 加密（沿用 v3：全局 salt + 缓存 master key，v2:iv:ct） ============
+const tenc = new TextEncoder(), tdec = new TextDecoder();
+const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const unb64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+let masterKey = null;
+
+async function deriveKey(password, salt) {
+  const km = await crypto.subtle.importKey('raw', tenc.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: ITER, hash: 'SHA-256' },
+    km, { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+}
+async function encryptWith(key, plaintext) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, tenc.encode(plaintext));
+  return `v2:${b64(iv)}:${b64(ct)}`;
+}
+async function encryptPw(plaintext) { return encryptWith(masterKey, plaintext); }
+async function decryptWith(key, packed) {
+  const [ver, ivB, ctB] = packed.split(':');
+  if (ver !== 'v2') throw new Error('格式版本不符: ' + ver);
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: unb64(ivB) }, key, unb64(ctB));
+  return tdec.decode(pt);
+}
+async function decryptPw(packed) { return decryptWith(masterKey, packed); }
+
+// ============ 解锁/锁定（沿用 v3：云端 vault_meta） ============
+async function fetchMeta() {
+  if (!supabase) throw new Error('未连接 Supabase');
+  const { data, error } = await supabase.from('vault_meta').select('salt,canary').eq('id', 1).maybeSingle();
+  if (error) throw new Error('读取 vault_meta 失败: ' + error.message);
+  return data;
+}
+async function tryResumeSession() {
+  const raw = sessionStorage.getItem(SESS_KEY);
+  if (!raw) return false;
+  try { masterKey = await crypto.subtle.importKey('raw', unb64(raw), { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']); return true; }
+  catch { sessionStorage.removeItem(SESS_KEY); return false; }
+}
+async function unlock(password) {
+  const meta = await fetchMeta();
+  const firstTime = !meta;
+  const saltB64 = firstTime ? b64(crypto.getRandomValues(new Uint8Array(16))) : meta.salt;
+  masterKey = await deriveKey(password, unb64(saltB64));
+  if (firstTime) {
+    const canary = await encryptPw(CANARY_PLAIN);
+    const { error } = await supabase.from('vault_meta').insert({ id: 1, salt: saltB64, canary });
+    if (error) { masterKey = null; throw new Error('初始化 vault_meta 失败: ' + error.message); }
+  } else {
+    try { const v = await decryptPw(meta.canary); if (v !== CANARY_PLAIN) throw new Error(); }
+    catch { masterKey = null; throw new Error('主密码错误'); }
+  }
+  sessionStorage.setItem(SESS_KEY, b64(await crypto.subtle.exportKey('raw', masterKey)));
+}
+function lock() {
+  masterKey = null;
+  sessionStorage.removeItem(SESS_KEY);
+  state = { accounts: [], platforms: [], countries: [] };
+  closeDrawer();
+  document.getElementById('lock').style.display = 'flex';
+  document.getElementById('mpw').value = '';
+  updateLockUI();
+  document.getElementById('mpw').focus();
+}
+async function updateLockUI() {
+  document.getElementById('lockErr').textContent = '';
+  let firstTime = false;
+  try { firstTime = !(await fetchMeta()); } catch {}
+  document.getElementById('lockWarn').style.display = firstTime ? 'block' : 'none';
+  document.getElementById('lockLead').textContent = firstTime
+    ? '首次使用，设定一个主密码。所有密码用它在本地加密，云端只存密文。'
+    : '输入主密码以解锁。';
+}
+
+// ============ 数据 ============
+let state = { accounts: [], platforms: [], countries: [] };
+const platformById = (id) => state.platforms.find(p => p.id === id);
+const countryById = (id) => state.countries.find(c => c.id === id);
+const accountById = (id) => state.accounts.find(a => a.id === id);
+
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove("show"), 1800);
+}
+async function copyEphemeral(text, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(label + " 已复制(30s 后清空)");
+    clearTimeout(window._clipT);
+    window._clipT = setTimeout(() => navigator.clipboard.writeText("").catch(()=>{}), 30000);
+  } catch { toast("复制失败,检查浏览器权限"); }
+}
+
+async function loadAll() {
+  if (!supabase) return;
+  connState.innerHTML = '加载中…';
+  const [a, p, c] = await Promise.all([
+    supabase.from('accounts').select('*').order('created_at', { ascending: true }),
+    supabase.from('platforms').select('*').order('sort', { ascending: true }),
+    supabase.from('countries').select('*').order('sort', { ascending: true }),
+  ]);
+  if (a.error || p.error || c.error) {
+    connState.innerHTML = '<b class="off">加载失败</b>';
+    toast('加载失败: ' + (a.error || p.error || c.error).message); return;
+  }
+  state.accounts = a.data; state.platforms = p.data; state.countries = c.data;
+  connState.innerHTML = `已连接 · <b>${state.accounts.length}</b> 账号`;
+  render();
+}
+
+// ============ 渲染：三等分 ============
+function esc(s){ return String(s ?? "").replace(/[&<>"]/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[ch])); }
+
+function countryTag(country_id) {
+  const c = countryById(country_id);
+  if (!c) return '';
+  return `<span class="ctag" style="color:${esc(c.color)}">${esc(c.name)}</span>`;
+}
+
+// 登录用邮箱：email 类是自身 name；apple/ai 是其关联的注册邮箱
+function emailOf(a) {
+  if (a.category === 'email') return a.name;
+  const e = a.register_email_id ? accountById(a.register_email_id) : null;
+  return e ? e.name : null;
+}
+
+function render() {
+  for (const cat of ['email', 'apple', 'ai']) {
+    const list = state.accounts.filter(a => a.category === cat);
+    document.getElementById('count-' + cat).textContent = list.length ? `· ${list.length}` : '';
+    const box = document.getElementById('col-' + cat);
+    if (!list.length) {
+      box.innerHTML = `<div class="col-empty">暂无${CAT_LABEL[cat].replace(/^.\s/, '')}账号<br>点上方「+ 账号」添加</div>`;
+      continue;
+    }
+    box.innerHTML = '';
+    list.forEach(a => box.appendChild(renderCard(a)));
+  }
+}
+
+function renderCard(a) {
+  const plat = platformById(a.platform_id);
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.borderLeftColor = CAT_COLOR[a.category];
+
+  let rel = '';
+  if (a.register_email_id) {
+    const e = accountById(a.register_email_id);
+    rel += `<span style="color:var(--cat-email)">→ 注册</span> <span class="link" data-goto="${a.register_email_id}">${e ? esc(e.name) : '?'}</span><br>`;
+  }
+  if (a.subscribe_apple_id) {
+    const ap = accountById(a.subscribe_apple_id);
+    rel += `<span style="color:var(--cat-apple)">→ 订阅于</span> <span class="link" data-goto="${a.subscribe_apple_id}">${ap ? esc(ap.name) : '?'}</span><br>`;
+  }
+
+  const showCountryPhone2fa = a.category === 'email' || a.category === 'apple';
+
+  card.innerHTML = `
+    <div class="ctop">
+      <div>
+        <div class="plat">${esc(plat ? plat.name : '—')}</div>
+        <div class="name">${esc(a.name)}</div>
+      </div>
+      <span class="edit" data-edit="${a.id}">编辑 ›</span>
+    </div>
+    ${showCountryPhone2fa ? countryTag(a.country_id) : ''}
+    <div class="meta">
+      ${showCountryPhone2fa && a.phone ? `<b>手机</b> ${esc(a.phone)} ${a.twofa_enabled ? '<span class="twofa-on">· 2FA✓</span>' : ''}<br>`
+        : (showCountryPhone2fa && a.twofa_enabled ? '<span class="twofa-on">2FA✓</span><br>' : '')}
+      ${a.encrypted_password ? '<span class="haspw"><b>密码</b> 已加密 ✓</span><br>' : '<span style="opacity:.6">无密码</span><br>'}
+      ${rel}
+    </div>
+    <div class="quick">
+      <button class="mini" data-cp-email="${a.id}">复制邮箱</button>
+      <button class="mini" data-cp-pass="${a.id}" ${a.encrypted_password ? '' : 'disabled'}>复制密码</button>
+    </div>`;
+
+  card.querySelector('[data-edit]').onclick = () => openForm(a);
+  card.querySelectorAll('[data-goto]').forEach(el => el.onclick = () => {
+    const t = accountById(el.dataset.goto); if (t) openForm(t);
+  });
+  card.querySelector('[data-cp-email]').onclick = () => {
+    const email = emailOf(a);
+    if (!email) return toast('无邮箱(未关联注册邮箱)');
+    copyEphemeral(email, '邮箱');
+  };
+  card.querySelector('[data-cp-pass]').onclick = async () => {
+    if (!a.encrypted_password) return toast('未设置密码');
+    try { await copyEphemeral(await decryptPw(a.encrypted_password), '密码'); }
+    catch { toast('解密失败(主密码不一致?)'); }
+  };
+  return card;
+}
+
+// ============ 账号表单（drawer，动态字段） ============
+const drawer = document.getElementById('drawer');
+function closeDrawer() { drawer.classList.remove('open'); }
+document.getElementById('drawerClose').onclick = closeDrawer;
+
+function platformOptions(selectedId) {
+  const groups = { email: '📧 Email', apple: '🍎 Apple', ai: '🤖 AI 工具' };
+  let html = '<option value="">— 选择平台 —</option>';
+  for (const cat of ['email', 'apple', 'ai']) {
+    const ps = state.platforms.filter(p => p.category === cat);
+    if (!ps.length) continue;
+    html += `<optgroup label="${groups[cat]}">`;
+    for (const p of ps) html += `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(p.name)}</option>`;
+    html += '</optgroup>';
+  }
+  return html;
+}
+function countryOptions(selectedId) {
+  let html = '<option value="">— 选择国家/地区 —</option>';
+  for (const c of state.countries)
+    html += `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)}</option>`;
+  return html;
+}
+function accountOptions(cat, selectedId) {
+  let html = '<option value="">— 无 —</option>';
+  for (const a of state.accounts.filter(x => x.category === cat))
+    html += `<option value="${a.id}" ${a.id === selectedId ? 'selected' : ''}>${esc(a.name)}</option>`;
+  return html;
+}
+
+function openForm(a) {
+  const isNew = !a || !a.id;
+  a = a || {};
+  document.getElementById('drawerTitle').textContent = isNew ? '新增账号' : '编辑账号';
+  const body = document.getElementById('drawerBody');
+  body.innerHTML = `
+    <label>平台 *</label>
+    <select id="f-platform">${platformOptions(a.platform_id)}</select>
+    <label>账号名 *</label>
+    <input id="f-name" value="${esc(a.name || '')}" placeholder="账号显示名">
+
+    <div class="field-email-apple">
+      <label>绑定手机号</label>
+      <input id="f-phone" value="${esc(a.phone || '')}" placeholder="+86 138 0000 0000">
+      <label>国家 / 地区</label>
+      <select id="f-country">${countryOptions(a.country_id)}</select>
+      <div class="toggle-row">
+        <input type="checkbox" id="f-2fa" ${a.twofa_enabled ? 'checked' : ''}>
+        <label for="f-2fa">已开启 2FA 两步验证</label>
+      </div>
+    </div>
+
+    <div class="field-register">
+      <label>注册邮箱（关联 Email 账号）</label>
+      <select id="f-register">${accountOptions('email', a.register_email_id)}</select>
+    </div>
+
+    <div class="field-subscribe">
+      <label>订阅 Apple ID（通过哪个 Apple ID 订阅）</label>
+      <select id="f-subscribe">${accountOptions('apple', a.subscribe_apple_id)}</select>
+    </div>
+
+    <label>密码（本地加密后存云）</label>
+    <div class="pw-row">
+      <input id="f-pw" type="password" placeholder="${a.encrypted_password ? '已加密 · 留空则不修改' : '输入密码'}">
+      <button class="mini ghost" id="f-pw-show" type="button">显示</button>
+    </div>
+    <div class="hint">明文密码,保存时用主密码加密,云端只存密文。</div>
+
+    <label>备注（恢复邮箱 / 支付信息 / 杂项都写这）</label>
+    <textarea id="f-note">${esc(a.note || '')}</textarea>
+
+    <div class="btn-row">
+      <button class="primary" id="f-save">保存</button>
+      ${isNew ? '' : '<button class="ghost" id="f-del" style="color:var(--danger)">删除</button>'}
+    </div>`;
+
+  const platSel = body.querySelector('#f-platform');
+  const applyCat = () => {
+    const p = platformById(platSel.value);
+    const cat = p ? p.category : null;
+    body.querySelector('.field-email-apple').classList.toggle('hidden', !(cat === 'email' || cat === 'apple'));
+    body.querySelector('.field-register').classList.toggle('hidden', !(cat === 'apple' || cat === 'ai'));
+    body.querySelector('.field-subscribe').classList.toggle('hidden', cat !== 'ai');
+  };
+  platSel.onchange = applyCat;
+  applyCat();
+
+  // 已有密码:解密填入
+  if (a.encrypted_password) {
+    decryptPw(a.encrypted_password).then(pw => { body.querySelector('#f-pw').value = pw; })
+      .catch(() => { body.querySelector('#f-pw').placeholder = '解密失败(主密码不一致?)'; });
+  }
+  const pwInput = body.querySelector('#f-pw');
+  body.querySelector('#f-pw-show').onclick = () => { pwInput.type = pwInput.type === 'password' ? 'text' : 'password'; };
+
+  body.querySelector('#f-save').onclick = () => saveAccount(a, isNew);
+  const del = body.querySelector('#f-del');
+  if (del) del.onclick = async () => {
+    if (!confirm(`删除账号「${a.name}」?`)) return;
+    const { error } = await supabase.from('accounts').delete().eq('id', a.id);
+    if (error) return toast('删除失败: ' + error.message);
+    closeDrawer(); await loadAll(); toast('已删除');
+  };
+
+  drawer.classList.add('open');
+}
+
+async function saveAccount(a, isNew) {
+  const body = document.getElementById('drawerBody');
+  const platId = body.querySelector('#f-platform').value;
+  const name = body.querySelector('#f-name').value.trim();
+  if (!platId) return toast('请选择平台');
+  if (!name) return toast('账号名必填');
+  const cat = platformById(platId).category;
+
+  const row = { category: cat, platform_id: platId, name, note: body.querySelector('#f-note').value.trim() || null };
+
+  if (cat === 'email' || cat === 'apple') {
+    row.phone = body.querySelector('#f-phone').value.trim() || null;
+    row.country_id = body.querySelector('#f-country').value || null;
+    row.twofa_enabled = body.querySelector('#f-2fa').checked;
+  } else {
+    row.phone = null; row.country_id = null; row.twofa_enabled = false;
+  }
+  row.register_email_id = (cat === 'apple' || cat === 'ai') ? (body.querySelector('#f-register').value || null) : null;
+  row.subscribe_apple_id = (cat === 'ai') ? (body.querySelector('#f-subscribe').value || null) : null;
+
+  const pwVal = body.querySelector('#f-pw').value;
+  if (pwVal) row.encrypted_password = await encryptPw(pwVal);
+  else if (!isNew) row.encrypted_password = a.encrypted_password;
+  else row.encrypted_password = null;
+
+  let error;
+  if (isNew) ({ error } = await supabase.from('accounts').insert(row));
+  else { row.updated_at = new Date().toISOString(); ({ error } = await supabase.from('accounts').update(row).eq('id', a.id)); }
+  if (error) return toast('保存失败: ' + error.message);
+  closeDrawer(); await loadAll(); toast(isNew ? '已新增' : '已保存');
+}
+
+// ============ 头部操作 ============
+document.getElementById('add').onclick = () => openForm({});
+document.getElementById('settings').onclick = openSettings;
+document.getElementById('lockNow').onclick = lock;
+
+// ---- 主题 ----
+const THEME_KEY = 'ag_theme';
+function applyTheme() {
+  const pref = localStorage.getItem(THEME_KEY) || 'system';
+  document.documentElement.dataset.theme = pref === 'system'
+    ? (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark') : pref;
+}
+function setTheme(pref) { localStorage.setItem(THEME_KEY, pref); applyTheme(); renderSettings(); }
+matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+  if ((localStorage.getItem(THEME_KEY) || 'system') === 'system') applyTheme();
+});
+
+// ---- 设置页（主题 + 平台 + 国家管理）----
+const sdrawer = document.getElementById('sdrawer');
+function openSettings() { renderSettings(); sdrawer.classList.add('open'); }
+document.getElementById('sdrawerClose').onclick = () => sdrawer.classList.remove('open');
+
+const platInUse = (id) => state.accounts.some(a => a.platform_id === id);
+const ctryInUse = (id) => state.accounts.some(a => a.country_id === id);
+
+function renderSettings() {
+  const pref = localStorage.getItem(THEME_KEY) || 'system';
+  const catLabel = { email: 'Email', apple: 'Apple', ai: 'AI' };
+  let html = `
+    <label>外观主题</label>
+    <div class="seg">
+      <button data-theme-set="light" class="${pref==='light'?'active':''}">亮色</button>
+      <button data-theme-set="dark" class="${pref==='dark'?'active':''}">暗色</button>
+      <button data-theme-set="system" class="${pref==='system'?'active':''}">跟随系统</button>
+    </div>
+    <label>平台管理</label>`;
+  for (const p of state.platforms)
+    html += `<div class="mrow"><span class="mname">${esc(p.name)}</span>
+      <span class="mcat">${catLabel[p.category] || p.category}</span>
+      <button class="mini ghost" data-del-plat="${p.id}">删</button></div>`;
+  html += `<div class="add-row">
+      <select id="newPlatCat" style="flex:none;width:84px">
+        <option value="email">Email</option><option value="apple">Apple</option><option value="ai">AI</option>
+      </select>
+      <input id="newPlatName" placeholder="平台名" style="flex:1">
+      <button class="mini" id="addPlat" style="flex:none">+ 加</button>
+    </div>
+    <label>国家 / 地区管理</label>`;
+  for (const c of state.countries)
+    html += `<div class="mrow"><span class="swatch2" style="background:${esc(c.color)}"></span>
+      <span class="mname">${esc(c.name)}</span>
+      <button class="mini ghost" data-del-ctry="${c.id}">删</button></div>`;
+  html += `<div class="add-row">
+      <input type="color" id="newCtryColor" value="#5b8fb0">
+      <input id="newCtryName" placeholder="国家/地区名" style="flex:1">
+      <button class="mini" id="addCtry" style="flex:none">+ 加</button>
+    </div>
+    <label>更改主密码</label>
+    <input type="password" id="curMpw" placeholder="当前主密码（验证身份）">
+    <input type="password" id="newMpw1" placeholder="新主密码" style="margin-top:6px">
+    <input type="password" id="newMpw2" placeholder="再次输入新主密码" style="margin-top:6px">
+    <div class="btn-row"><button id="changeMpw">更改并重新加密全部</button></div>
+    <div class="hint">会用新密码重新加密所有条目（事务原子，失败不损坏）。建议先「导出」备份。</div>`;
+
+  const body = document.getElementById('sdrawerBody');
+  body.innerHTML = html;
+  body.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => setTheme(b.dataset.themeSet));
+  body.querySelectorAll('[data-del-plat]').forEach(b => b.onclick = () => delPlatform(b.dataset.delPlat));
+  body.querySelectorAll('[data-del-ctry]').forEach(b => b.onclick = () => delCountry(b.dataset.delCtry));
+  body.querySelector('#addPlat').onclick = addPlatform;
+  body.querySelector('#addCtry').onclick = addCountry;
+  body.querySelector('#changeMpw').onclick = doChangeMasterPassword;
+}
+
+async function addPlatform() {
+  const cat = document.getElementById('newPlatCat').value;
+  const name = document.getElementById('newPlatName').value.trim();
+  if (!name) return toast('平台名必填');
+  const sort = Math.max(0, ...state.platforms.map(p => p.sort)) + 1;
+  const { error } = await supabase.from('platforms').insert({ category: cat, name, sort });
+  if (error) return toast('添加失败: ' + error.message);
+  await loadAll(); renderSettings(); toast('平台已添加');
+}
+async function delPlatform(id) {
+  if (platInUse(id)) return toast('有账号在用此平台，不能删');
+  const { error } = await supabase.from('platforms').delete().eq('id', id);
+  if (error) return toast('删除失败: ' + error.message);
+  await loadAll(); renderSettings(); toast('平台已删除');
+}
+async function addCountry() {
+  const name = document.getElementById('newCtryName').value.trim();
+  const color = document.getElementById('newCtryColor').value;
+  if (!name) return toast('国家名必填');
+  const sort = Math.max(0, ...state.countries.map(c => c.sort)) + 1;
+  const { error } = await supabase.from('countries').insert({ name, color, sort });
+  if (error) return toast('添加失败: ' + error.message);
+  await loadAll(); renderSettings(); toast('国家已添加');
+}
+async function delCountry(id) {
+  if (ctryInUse(id)) return toast('有账号在用此国家，不能删');
+  const { error } = await supabase.from('countries').delete().eq('id', id);
+  if (error) return toast('删除失败: ' + error.message);
+  await loadAll(); renderSettings(); toast('国家已删除');
+}
+
+// ---- 更改主密码（全量重加密，RPC 事务原子）----
+async function verifyMasterPassword(pw) {
+  const meta = await fetchMeta();
+  if (!meta) return false;
+  try {
+    const key = await deriveKey(pw, unb64(meta.salt));
+    return (await decryptWith(key, meta.canary)) === CANARY_PLAIN;
+  } catch { return false; }
+}
+async function doChangeMasterPassword() {
+  const cur = document.getElementById('curMpw').value;
+  const p1 = document.getElementById('newMpw1').value;
+  const p2 = document.getElementById('newMpw2').value;
+  if (!cur) return toast('请输入当前主密码');
+  if (!p1) return toast('新密码不能为空');
+  if (p1 !== p2) return toast('两次新密码不一致');
+  if (!(await verifyMasterPassword(cur))) return toast('当前主密码错误');
+  if (!confirm('将用新主密码重新加密所有密码。建议已先导出备份。继续？')) return;
+  const btn = document.getElementById('changeMpw');
+  btn.disabled = true; btn.textContent = '重新加密中…';
+  try {
+    await changeMasterPassword(p1);
+    toast('主密码已更改');
+    sdrawer.classList.remove('open');
+  } catch (e) {
+    toast('更改失败（数据未变动）: ' + (e.message || e));
+  } finally {
+    btn.disabled = false; btn.textContent = '更改并重新加密全部';
+  }
+}
+async function changeMasterPassword(newPw) {
+  const withPw = state.accounts.filter(a => a.encrypted_password);
+  const newSalt = crypto.getRandomValues(new Uint8Array(16));
+  const newKey = await deriveKey(newPw, newSalt);   // 新 salt + 新 key
+  const updates = [];
+  for (const a of withPw) {
+    const plain = await decryptPw(a.encrypted_password);       // 旧 key（内存）解密
+    updates.push({ id: a.id, ct: await encryptWith(newKey, plain) }); // 新 key 重加密
+  }
+  const newCanary = await encryptWith(newKey, CANARY_PLAIN);
+  const { error } = await supabase.rpc('rotate_master_key', {
+    p_salt: b64(newSalt), p_canary: newCanary, p_updates: updates
+  });
+  if (error) throw new Error(error.message);   // 失败：DB 不变，旧 key 仍有效
+  masterKey = newKey;                          // 成功后才切换内存 key
+  sessionStorage.setItem(SESS_KEY, b64(await crypto.subtle.exportKey('raw', newKey)));
+  await loadAll();
+}
+document.getElementById('export').onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const el = document.createElement('a'); el.href = url; el.download = 'account-graph-backup.json'; el.click();
+  URL.revokeObjectURL(url); toast('已导出(含密文)');
+};
+document.getElementById('seed').onclick = seedDemo;
+
+async function seedDemo() {
+  if (!confirm('写入演示数据? 会按 Email→Apple→AI 顺序插入并建立关联。')) return;
+  const plat = (name) => state.platforms.find(p => p.name === name);
+  const ctry = (name) => state.countries.find(c => c.name === name);
+  const gmail = plat('Gmail'), appleP = plat('Apple ID'), openaiP = plat('OpenAI'), claudeP = plat('Claude');
+  const us = ctry('美区'), ng = ctry('尼日利亚'), tr = ctry('土耳其');
+
+  // 1. Email（根）
+  const emails = [
+    { category:'email', platform_id:gmail.id, name:'primary@gmail.com', phone:'+86 138 0000 1234', country_id:us?.id, twofa_enabled:true, encrypted_password: await encryptPw('demo-gmail-main') },
+    { category:'email', platform_id:gmail.id, name:'work@gmail.com', phone:'+86 139 0000 5678', country_id:us?.id, twofa_enabled:true, encrypted_password: await encryptPw('demo-gmail-work') },
+  ];
+  const insE = await supabase.from('accounts').insert(emails).select();
+  if (insE.error) return toast('seed Email 失败: ' + insE.error.message);
+  const eId = (n) => insE.data.find(x => x.name === n).id;
+
+  // 2. Apple（关联 Email）
+  const apples = [
+    { category:'apple', platform_id:appleP.id, name:'Apple ID 尼日利亚', country_id:ng?.id, twofa_enabled:true, register_email_id:eId('primary@gmail.com'), encrypted_password: await encryptPw('demo-apple-ng') },
+    { category:'apple', platform_id:appleP.id, name:'Apple ID 土耳其', country_id:tr?.id, twofa_enabled:true, register_email_id:eId('work@gmail.com'), encrypted_password: await encryptPw('demo-apple-tr') },
+  ];
+  const insA = await supabase.from('accounts').insert(apples).select();
+  if (insA.error) return toast('seed Apple 失败: ' + insA.error.message);
+  const aId = (n) => insA.data.find(x => x.name === n).id;
+
+  // 3. AI（关联 Email + 订阅 Apple）
+  const ais = [
+    { category:'ai', platform_id:claudeP.id, name:'Claude Pro', register_email_id:eId('primary@gmail.com'), subscribe_apple_id:aId('Apple ID 尼日利亚'), encrypted_password: await encryptPw('demo-claude') },
+    { category:'ai', platform_id:openaiP.id, name:'OpenAI Plus', register_email_id:eId('work@gmail.com'), subscribe_apple_id:aId('Apple ID 土耳其'), encrypted_password: await encryptPw('demo-openai') },
+  ];
+  const insAI = await supabase.from('accounts').insert(ais);
+  if (insAI.error) return toast('seed AI 失败: ' + insAI.error.message);
+  await loadAll(); toast('演示数据已写入');
+}
+
+// ============ 启动 ============
+const unlockBtn = document.getElementById('unlockBtn');
+const mpwInput = document.getElementById('mpw');
+async function doUnlock() {
+  const pw = mpwInput.value; if (!pw) return;
+  unlockBtn.disabled = true; unlockBtn.textContent = '派生密钥中…';
+  document.getElementById('lockErr').textContent = '';
+  try {
+    await unlock(pw);
+    document.getElementById('lock').style.display = 'none';
+    await loadAll();
+  } catch (e) { document.getElementById('lockErr').textContent = e.message || '解锁失败'; }
+  finally { unlockBtn.disabled = false; unlockBtn.textContent = '解锁'; }
+}
+unlockBtn.onclick = doUnlock;
+mpwInput.addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock(); });
+
+// ---- Supabase Auth 门禁（在 master password 之前）----
+async function enterMasterPasswordGate() {
+  document.getElementById('login').style.display = 'none';
+  if (await tryResumeSession()) {
+    document.getElementById('lock').style.display = 'none';
+    await loadAll();
+  } else {
+    document.getElementById('lock').style.display = 'flex';
+    await updateLockUI();
+    document.getElementById('mpw').focus();
+  }
+}
+function showLogin() {
+  document.getElementById('lock').style.display = 'none';
+  document.getElementById('login').style.display = 'flex';
+  document.getElementById('loginEmail').focus();
+}
+const loginBtn = document.getElementById('loginBtn');
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw = document.getElementById('loginPw').value;
+  if (!email || !pw) return;
+  loginBtn.disabled = true; loginBtn.textContent = '登录中…';
+  document.getElementById('loginErr').textContent = '';
+  const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+  loginBtn.disabled = false; loginBtn.textContent = '登录';
+  if (error) { document.getElementById('loginErr').textContent = '登录失败: ' + error.message; return; }
+  await enterMasterPasswordGate();
+}
+loginBtn.onclick = doLogin;
+document.getElementById('loginPw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('logout').onclick = async () => {
+  masterKey = null; sessionStorage.removeItem(SESS_KEY);
+  if (supabase) await supabase.auth.signOut();
+  location.reload();
+};
+
+(async () => {
+  if (!supabase) return;
+  const { data } = await supabase.auth.getSession();
+  if (data.session) await enterMasterPasswordGate();
+  else showLogin();
+})();
+</script>
+</body>
+</html>
