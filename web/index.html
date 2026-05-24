@@ -176,7 +176,6 @@
   <button class="ghost" id="lockNow">🔒 锁定</button>
   <button class="ghost" id="logout">退出登录</button>
   <button class="ghost" id="export">导出</button>
-  <button class="ghost" id="seed">示例数据</button>
 </header>
 
 <main>
@@ -724,43 +723,6 @@ document.getElementById('export').onclick = () => {
   const el = document.createElement('a'); el.href = url; el.download = 'account-graph-backup.json'; el.click();
   URL.revokeObjectURL(url); toast('已导出(含密文)');
 };
-document.getElementById('seed').onclick = seedDemo;
-
-async function seedDemo() {
-  if (!confirm('写入演示数据? 会按 Email→Apple→AI 顺序插入并建立关联。')) return;
-  const plat = (name) => state.platforms.find(p => p.name === name);
-  const ctry = (name) => state.countries.find(c => c.name === name);
-  const gmail = plat('Gmail'), appleP = plat('Apple ID'), openaiP = plat('OpenAI'), claudeP = plat('Claude');
-  const us = ctry('美区'), ng = ctry('尼日利亚'), tr = ctry('土耳其');
-
-  // 1. Email（根）
-  const emails = [
-    { category:'email', platform_id:gmail.id, name:'primary@gmail.com', phone:'+86 138 0000 1234', country_id:us?.id, twofa_enabled:true, encrypted_password: await encryptPw('demo-gmail-main') },
-    { category:'email', platform_id:gmail.id, name:'work@gmail.com', phone:'+86 139 0000 5678', country_id:us?.id, twofa_enabled:true, encrypted_password: await encryptPw('demo-gmail-work') },
-  ];
-  const insE = await supabase.from('accounts').insert(emails).select();
-  if (insE.error) return toast('seed Email 失败: ' + insE.error.message);
-  const eId = (n) => insE.data.find(x => x.name === n).id;
-
-  // 2. Apple（关联 Email）
-  const apples = [
-    { category:'apple', platform_id:appleP.id, name:'Apple ID 尼日利亚', country_id:ng?.id, twofa_enabled:true, register_email_id:eId('primary@gmail.com'), encrypted_password: await encryptPw('demo-apple-ng') },
-    { category:'apple', platform_id:appleP.id, name:'Apple ID 土耳其', country_id:tr?.id, twofa_enabled:true, register_email_id:eId('work@gmail.com'), encrypted_password: await encryptPw('demo-apple-tr') },
-  ];
-  const insA = await supabase.from('accounts').insert(apples).select();
-  if (insA.error) return toast('seed Apple 失败: ' + insA.error.message);
-  const aId = (n) => insA.data.find(x => x.name === n).id;
-
-  // 3. AI（关联 Email + 订阅 Apple）
-  const ais = [
-    { category:'ai', platform_id:claudeP.id, name:'Claude Pro', register_email_id:eId('primary@gmail.com'), subscribe_apple_id:aId('Apple ID 尼日利亚'), encrypted_password: await encryptPw('demo-claude') },
-    { category:'ai', platform_id:openaiP.id, name:'OpenAI Plus', register_email_id:eId('work@gmail.com'), subscribe_apple_id:aId('Apple ID 土耳其'), encrypted_password: await encryptPw('demo-openai') },
-  ];
-  const insAI = await supabase.from('accounts').insert(ais);
-  if (insAI.error) return toast('seed AI 失败: ' + insAI.error.message);
-  await loadAll(); toast('演示数据已写入');
-}
-
 // ============ 启动 ============
 const unlockBtn = document.getElementById('unlockBtn');
 const mpwInput = document.getElementById('mpw');
