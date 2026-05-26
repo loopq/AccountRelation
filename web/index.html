@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>账号图谱 v4 · 分类树</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#f4f4f0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="账号图谱">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
 <style>
   :root {
     --bg: #0e0f13; --panel: #16181f; --panel-2: #1d2029; --line: #2a2e3a;
@@ -25,7 +33,7 @@
     display: flex; flex-direction: column; overflow: hidden; -webkit-text-size-adjust: 100%;
   }
   header {
-    padding: 13px 20px; border-bottom: 1px solid var(--line);
+    padding: max(13px, env(safe-area-inset-top)) 20px 13px; border-bottom: 1px solid var(--line);
     display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   }
   header h1 { font-size: 15px; font-weight: 600; }
@@ -127,10 +135,32 @@
   #lock .lead, #login .lead, #config .lead { font-size: 12px; color: var(--ink-dim); line-height: 1.7; margin-bottom: 20px; }
   #lock .warn { font-size: 11px; color: var(--danger); margin-top: 12px; line-height: 1.6; }
   #lock #lockErr, #login #loginErr, #config #cfgErr { font-size: 12px; color: var(--danger); margin-top: 10px; min-height: 16px; }
+  /* 顶部分类 tab：桌面隐藏，仅手机显示 */
+  .tabbar { display: none; }
+  /* 仅手机可见的元素（如设置抽屉里的快捷操作） */
+  .mobile-only { display: none; }
   @media (max-width: 760px) {
+    /* 分类切换 tab 栏 */
+    .tabbar { display: flex; gap: 1px; background: var(--line); border-bottom: 1px solid var(--line); }
+    .tabbar button {
+      flex: 1; min-height: 46px; border: none; border-radius: 0; background: var(--bg);
+      font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .tabbar button:hover { border: none; }
+    .tabbar button.active { background: var(--panel-2); color: var(--accent); font-weight: 600; }
+    .tabbar .bar { width: 3px; height: 14px; border-radius: 2px; }
+    /* 三列 → 单列：只显活动列，整页一条竖列表自然滚动 */
     main { flex-direction: column; overflow-y: auto; }
-    .column { min-height: 200px; }
+    .column { display: none; }
+    .column.active { display: flex; flex: 1; min-height: 0; }
+    .col-head { display: none; }
+    .col-body { overflow: visible; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+    /* 触控热区放大 + 抽屉占满 */
+    header button, .quick button { min-height: 40px; }
+    .mobile-only { display: block; }
     #drawer, #sdrawer { width: 100%; }
+    /* 手机 header 收纳：锁定/退出/导出 移进设置抽屉 */
+    #lockNow, #logout, #export { display: none; }
   }
 </style>
 <script>
@@ -190,6 +220,12 @@
   <button class="ghost" id="logout">退出登录</button>
   <button class="ghost" id="export">导出</button>
 </header>
+
+<nav id="tabbar" class="tabbar">
+  <button data-tab="email" class="active"><span class="bar" style="background:var(--cat-email)"></span>📧 EMAIL <span id="tab-count-email"></span></button>
+  <button data-tab="apple"><span class="bar" style="background:var(--cat-apple)"></span>🍎 APPLE <span id="tab-count-apple"></span></button>
+  <button data-tab="ai"><span class="bar" style="background:var(--cat-ai)"></span>🤖 AI <span id="tab-count-ai"></span></button>
+</nav>
 
 <main>
   <div class="column" data-cat="email">
@@ -380,7 +416,9 @@ function emailOf(a) {
 function render() {
   for (const cat of ['email', 'apple', 'ai']) {
     const list = state.accounts.filter(a => a.category === cat);
-    document.getElementById('count-' + cat).textContent = list.length ? `· ${list.length}` : '';
+    const cnt = list.length ? `· ${list.length}` : '';
+    document.getElementById('count-' + cat).textContent = cnt;
+    document.getElementById('tab-count-' + cat).textContent = cnt;
     const box = document.getElementById('col-' + cat);
     if (!list.length) {
       box.innerHTML = `<div class="col-empty">暂无${CAT_LABEL[cat].replace(/^.\s/, '')}账号<br>点上方「+ 账号」添加</div>`;
@@ -624,6 +662,15 @@ document.getElementById('add').onclick = () => openForm({});
 document.getElementById('settings').onclick = openSettings;
 document.getElementById('lockNow').onclick = lock;
 
+// ---- 手机分类 tab 切换（纯展示层；桌面 tab 栏 display:none，三列照旧并排）----
+const tabbar = document.getElementById('tabbar');
+function setTab(cat) {
+  document.querySelectorAll('main > .column').forEach(c => c.classList.toggle('active', c.dataset.cat === cat));
+  tabbar.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.tab === cat));
+}
+tabbar.querySelectorAll('button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+setTab('email');
+
 // ---- 主题 ----
 const THEME_KEY = 'ag_theme';
 function applyTheme() {
@@ -648,6 +695,14 @@ function renderSettings() {
   const pref = localStorage.getItem(THEME_KEY) || 'system';
   const catLabel = { email: 'Email', apple: 'Apple', ai: 'AI' };
   let html = `
+    <div class="mobile-only">
+      <label>快捷操作</label>
+      <div class="seg">
+        <button id="mLock" class="ghost">🔒 锁定</button>
+        <button id="mExport" class="ghost">⬇ 导出</button>
+        <button id="mLogout" class="ghost">退出登录</button>
+      </div>
+    </div>
     <label>外观主题</label>
     <div class="seg">
       <button data-theme-set="light" class="${pref==='light'?'active':''}">亮色</button>
@@ -692,6 +747,10 @@ function renderSettings() {
 
   const body = document.getElementById('sdrawerBody');
   body.innerHTML = html;
+  // 手机快捷操作（复用 header 同款 handler，无逻辑复制）
+  body.querySelector('#mLock').onclick = () => { sdrawer.classList.remove('open'); lock(); };
+  body.querySelector('#mExport').onclick = doExport;
+  body.querySelector('#mLogout').onclick = doLogout;
   body.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => setTheme(b.dataset.themeSet));
   body.querySelectorAll('[data-del-plat]').forEach(b => b.onclick = () => delPlatform(b.dataset.delPlat));
   body.querySelectorAll('[data-del-ctry]').forEach(b => b.onclick = () => delCountry(b.dataset.delCtry));
@@ -818,12 +877,13 @@ async function doBatchImport() {
   await loadAll();
   toast(`导入：成功 ${ok}，失败 ${fail}`);
 }
-document.getElementById('export').onclick = () => {
+function doExport() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const el = document.createElement('a'); el.href = url; el.download = 'account-graph-backup.json'; el.click();
   URL.revokeObjectURL(url); toast('已导出(含密文)');
-};
+}
+document.getElementById('export').onclick = doExport;
 // ============ 启动 ============
 const unlockBtn = document.getElementById('unlockBtn');
 const mpwInput = document.getElementById('mpw');
@@ -872,11 +932,12 @@ async function doLogin() {
 }
 loginBtn.onclick = doLogin;
 document.getElementById('loginPw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-document.getElementById('logout').onclick = async () => {
+async function doLogout() {
   masterKey = null; sessionStorage.removeItem(SESS_KEY);
   if (supabase) await supabase.auth.signOut();
   location.reload();
-};
+}
+document.getElementById('logout').onclick = doLogout;
 
 // ---- Supabase 配置（可配置：各连各的库）----
 function showConfig() {
@@ -902,6 +963,14 @@ document.getElementById('cfgSave').onclick = () => {
   if (data.session) await enterMasterPasswordGate();
   else showLogin();
 })();
+</script>
+<script>
+  // 注册 Service Worker（失败静默，不影响普通网页使用）
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
 </script>
 </body>
 </html>

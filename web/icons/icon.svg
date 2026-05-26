@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- 全方形深底：规避 iOS 透明角填黑；mark 收在中心安全区，兼容 Android maskable 裁切 -->
+  <rect width="512" height="512" fill="#0e0f13"/>
+  <!-- 根节点 → 三分类 连线（先画，压在节点下） -->
+  <g stroke="#39404e" stroke-width="12" stroke-linecap="round">
+    <line x1="256" y1="150" x2="140" y2="360"/>
+    <line x1="256" y1="150" x2="256" y2="360"/>
+    <line x1="256" y1="150" x2="372" y2="360"/>
+  </g>
+  <!-- 根节点：账号库 -->
+  <circle cx="256" cy="150" r="40" fill="#ece9e2"/>
+  <!-- 三分类：Email 蓝 / Apple 金 / AI 紫 -->
+  <circle cx="140" cy="360" r="40" fill="#5b8fb0"/>
+  <circle cx="256" cy="360" r="40" fill="#d4a857"/>
+  <circle cx="372" cy="360" r="40" fill="#9b7fc4"/>
+</svg>
