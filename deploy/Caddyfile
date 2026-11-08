@@ -1,0 +1,18 @@
+{
+	http_port 8080
+	https_port 8443
+	servers {
+		protocols h1 h2
+		strict_sni_host on
+	}
+}
+
+http:// {
+	respond "Unknown host" 404
+}
+
+account.loopq.cn {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy account-relation-app:3000
+}

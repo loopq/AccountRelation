@@ -1,0 +1,16 @@
+{
+  "url": "https://account.loopq.cn/",
+  "forcedResolver": false,
+  "tls": {
+    "issuer": "YE2",
+    "protocol": "TLS 1.3",
+    "subjectName": "account.loopq.cn",
+    "validFrom": 1794116379,
+    "validTo": 1801892378
+  },
+  "login": true,
+  "secureCookie": true,
+  "logoutRevoked": true,
+  "productionVaultInitialized": false,
+  "productionAccounts": 0
+}

@@ -1,0 +1,5 @@
+
+> account-relation@1.0.0 check
+> node scripts/check.js
+
+JavaScript syntax and production entrypoint checks passed.

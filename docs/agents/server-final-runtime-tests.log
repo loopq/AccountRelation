@@ -1,0 +1,25 @@
+RELEASE=9b2109772aad4384f75b
+✔ authentication, CSRF, cookies, validation, host and static boundaries (1470.59528ms)
+✔ rate limiting, session expiry, admin singleton and reset revocation (2153.446601ms)
+request_failed SQLITE_CONSTRAINT_TRIGGER
+✔ CRUD relationships, import atomicity, optimistic writes and complete key rotation (1320.746666ms)
+✔ empty-vault rotation and racing initialization (1230.887237ms)
+✔ non-exportable keys, random IVs, authentication and online WAL backup restore (668.686749ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7267.203295
+IMAGE_SOURCE_MANIFEST_MATCH; NO_SUPABASE_OR_MOBILE_IN_IMAGE
+active
+active
+active
+active
+active
+active
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+
+0 loaded units listed.

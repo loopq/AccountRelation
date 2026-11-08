@@ -1,0 +1,18 @@
+/etc/systemd/system/tat_agent.service:7: PIDFile= references a path below legacy directory /var/run/, updating /var/run/tat_agent.pid → /run/tat_agent.pid; please update the unit file accordingly.
+Created symlink /etc/systemd/system/timers.target.wants/account-relation-backup.timer → /etc/systemd/system/account-relation-backup.timer.
+Result=success
+ExecMainStatus=0
+SERVER_BACKUP_TIMER_READY
+✔ authentication, CSRF, cookies, validation, host and static boundaries (1320.53364ms)
+✔ rate limiting, session expiry, admin singleton and reset revocation (2201.596695ms)
+✔ CRUD relationships, import atomicity, optimistic writes and complete key rotation (1295.366493ms)
+✔ empty-vault rotation and racing initialization (1227.007175ms)
+✔ non-exportable keys, random IVs, authentication and online WAL backup restore (671.534333ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7160.923931

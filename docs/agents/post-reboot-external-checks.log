@@ -1,0 +1,3 @@
+TLS trust and certificate persistence PASS
+Deploy publickey login and privilege isolation PASS
+Admin SSH password/interactive methods absent; publickey only PASS

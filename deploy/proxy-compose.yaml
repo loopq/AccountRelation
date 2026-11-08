@@ -1,0 +1,28 @@
+name: shared-proxy
+services:
+  caddy:
+    image: caddy:2@sha256:ce773ec7a742ce15ee6bf2bb5f65882b9e2a4487b10733e6f1484f86e6b5d8bc
+    user: "1000:1000"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 100
+    ports: ["80:8080", "443:8443"]
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    volumes:
+      - /opt/apps/reverse-proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - /var/lib/caddy/data:/data
+      - /var/lib/caddy/config:/config
+    networks: [edge, account]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+networks:
+  edge:
+    name: shared-proxy-edge
+  account:
+    name: account-relation-private
+    external: true

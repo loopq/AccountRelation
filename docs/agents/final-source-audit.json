@@ -1,0 +1,9 @@
+{
+  "release": "9b2109772aad4384f75b",
+  "baseCommit": "4878342b4d9b5d1c44edb7cb3ee022cf69b365a0",
+  "runtimeSourceMatchesRelease": true,
+  "postReleaseVerificationToolUpdates": [
+    "scripts/verify-public.mjs"
+  ],
+  "productionCredentialMode": "0600"
+}

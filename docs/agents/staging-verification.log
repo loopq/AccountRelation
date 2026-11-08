@@ -1,0 +1,13 @@
+EXPECTED_HOST=200
+UNKNOWN_HOST=404
+MISMATCHED_SNI_HOST=421
+ANONYMOUS_API=401
+HTTP/1.1 308 Permanent Redirect
+Connection: close
+Location: https://account.loopq.cn/
+Server: Caddy
+Date: Sun, 08 Nov 2026 06:33:36 GMT
+
+/account-relation-app-1 user=1000:1000 readonly=true caps=["ALL"] security=["no-new-privileges:true"] memory=536870912 ports={}
+/shared-proxy-caddy-1 user=1000:1000 readonly=true caps=["ALL"] security=["no-new-privileges:true"] memory=268435456 ports={"8080/tcp":[{"HostIp":"127.0.0.1","HostPort":"80"}],"8443/tcp":[{"HostIp":"127.0.0.1","HostPort":"443"}]}
+DEPLOY_PRIVILEGE_BOUNDARIES_PASS

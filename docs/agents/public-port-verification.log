@@ -1,0 +1,11 @@
+INVALID AS EXPOSURE EVIDENCE: local TUN proxy accepted TCP handshakes on all ports. This initial check failed and was replaced by public-port-protocol-verification.log plus server listeners, Docker mappings and cloud/UFW rules.
+
+TCP 22 OPEN
+TCP 80 OPEN
+TCP 443 OPEN
+TCP 3000 OPEN
+TCP 3306 OPEN
+TCP 5432 OPEN
+TCP 2019 OPEN
+TCP 8080 OPEN
+TCP 8443 OPEN

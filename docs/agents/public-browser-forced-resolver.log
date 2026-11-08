@@ -1,0 +1,7 @@
+API /api/session 200
+API /api/login 200
+API /api/state 200
+STATE_SHAPE {"vaultInitialized":false,"accounts":0,"revision":0}
+API /api/logout 200
+API /api/state 401
+PUBLIC_BROWSER_TLS_LOGIN_LOGOUT_PASS; PRODUCTION_VAULT_EMPTY

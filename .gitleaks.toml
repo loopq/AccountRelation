@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+# This SQL column identifier is not a credential. Match both its exact value
+# and its exact source file; all other secrets in this file remain detectable.
+[[allowlists]]
+description = "SQLite encrypted_2fa column identifier"
+condition = "AND"
+paths = ['''(^|/)server/store\.js$''']
+regexTarget = "secret"
+regexes = ['''^encrypted_2fa$''']

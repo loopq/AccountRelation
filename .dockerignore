@@ -1,0 +1,16 @@
+*
+!Dockerfile
+!package.json
+!package-lock.json
+!server/
+!server/**
+!web/
+!web/index.html
+!web/app.js
+!web/api-client.js
+!web/crypto.js
+!web/theme.js
+!web/sw.js
+!web/manifest.webmanifest
+!web/icons/
+!web/icons/**

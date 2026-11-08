@@ -1,0 +1,11 @@
+22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.20
+80 HTTP/1.1 308 Permanent Redirect
+443 TLS verified ((('commonName', 'account.loopq.cn'),),)
+3000 timeout; no application response
+3306 timeout; no application response
+5432 timeout; no application response
+2019 timeout; no application response
+8080 timeout; no application response
+8443 timeout; no application response
+65534 timeout; no application response
+TCP connect alone is inconclusive under the local TUN proxy; use protocol replies plus server listeners, Docker mappings and cloud/UFW rules.

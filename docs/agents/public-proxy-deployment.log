@@ -1,0 +1,35 @@
+{"level":"info","ts":1794119881.2195408,"msg":"using config from file","file":"/etc/caddy/Caddyfile"}
+{"level":"info","ts":1794119881.2215288,"msg":"adapted config to JSON","adapter":"caddyfile"}
+{"level":"warn","ts":1794119881.2222872,"logger":"http.auto_https","msg":"server is listening only on the HTTP port, so no automatic HTTPS will be applied to this server","server_name":"srv0","http_port":8080}
+{"level":"info","ts":1794119881.2223737,"logger":"http.auto_https","msg":"server is listening only on the HTTPS port but has no TLS connection policies; adding one to enable TLS","server_name":"srv1","https_port":8443}
+{"level":"info","ts":1794119881.2223957,"logger":"http.auto_https","msg":"enabling automatic HTTP->HTTPS redirects","server_name":"srv1"}
+{"level":"info","ts":1794119881.222513,"logger":"tls.cache.maintenance","msg":"started background certificate maintenance","cache":"0x17e4d5c59880"}
+{"level":"info","ts":1794119881.2229369,"logger":"http","msg":"servers shutting down with eternal grace period"}
+{"level":"info","ts":1794119881.2230318,"logger":"tls.cache.maintenance","msg":"stopped background certificate maintenance","cache":"0x17e4d5c59880"}
+Valid configuration
+Rule added
+Rule added (v6)
+Rule added
+Rule added (v6)
+ Container shared-proxy-caddy-1 Recreate
+ Container shared-proxy-caddy-1 Recreated
+ Container shared-proxy-caddy-1 Starting
+ Container shared-proxy-caddy-1 Started
+ Container shared-proxy-caddy-1 Waiting
+ Container shared-proxy-caddy-1 Healthy
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere
+80/tcp                     ALLOW IN    Anywhere                   # Shared Caddy HTTP
+443/tcp                    ALLOW IN    Anywhere                   # Shared Caddy HTTPS
+22/tcp (v6)                ALLOW IN    Anywhere (v6)
+80/tcp (v6)                ALLOW IN    Anywhere (v6)              # Shared Caddy HTTP
+443/tcp (v6)               ALLOW IN    Anywhere (v6)              # Shared Caddy HTTPS
+
+shared-proxy-caddy-1 Up Less than a second 80/tcp, 443/tcp, 2019/tcp, 443/udp, 0.0.0.0:80->8080/tcp, [::]:80->8080/tcp, 0.0.0.0:443->8443/tcp, [::]:443->8443/tcp
+account-relation-app-1 Up 30 seconds (healthy) 3000/tcp

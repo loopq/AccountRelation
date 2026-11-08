@@ -1,0 +1,16 @@
+HTTP/2 200
+accept-ranges: bytes
+cache-control: no-cache
+content-security-policy: default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; manifest-src 'self'; worker-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'
+content-type: text/html; charset=utf-8
+date: Sun, 08 Nov 2026 06:38:54 GMT
+etag: W/"3198-0"
+last-modified: Thu, 01 Jan 1970 00:00:00 GMT
+permissions-policy: camera=(), microphone=(), geolocation=()
+referrer-policy: no-referrer
+strict-transport-security: max-age=31536000
+vary: Accept-Encoding
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: DENY
+content-length: 12696

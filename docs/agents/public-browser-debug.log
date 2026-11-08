@@ -1,0 +1,14 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+locator.textContent: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for locator('#loginErr')[22m
+
+    at <ACCOUNT_RELATION_REPO>/scripts/verify-public.mjs:33:70 {
+  log: [ "  - waiting for locator('#loginErr')" ],
+  name: 'TimeoutError'
+}
+
+Node.js v25.9.0

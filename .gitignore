@@ -1,9 +1,10 @@
 # ============================================
-# 只推送 web 端应用本体，其余全部忽略
+# 网页端源码、部署脚本与脱敏验收记录
 # ============================================
 
-# 内部文档（plan / review / 预调研 / AI 规则）——不上传
-docs/
+# 仅提交用户授权的 docs/agents 脱敏审计副本
+/docs/*
+!/docs/agents/
 账号图谱-预调研交接.md
 CLAUDE.md
 
@@ -32,3 +33,26 @@ account-graph-backup*.json
 # 依赖（将来若引入构建）
 node_modules/
 dist/
+
+# Self-hosted runtime secrets, data, and browser artifacts
+.env
+.env.*
+!.env.example
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+playwright-report/
+test-results/
+artifacts/
+
+# User-approved sanitized audit outputs
+!/docs/agents/*.log
+*.pem
+*.key
+*.p12
+*.pfx
+*.aesgcm
+admin.json
+*-ssh.json

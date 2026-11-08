@@ -1,0 +1,2 @@
+('normal_dns', 0, 'HTTP=200 IP=192.0.2.10 TIME=0.504957', '')
+('resolved_server', 0, 'HTTP=200 IP=203.0.113.10 TIME=0.267098', '')

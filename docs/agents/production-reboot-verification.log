@@ -1,0 +1,61 @@
+BOOT_BEFORE=51dffcfa-50c5-4777-a684-8e7995911a53
+BOOT_AFTER=a01ba4c2-f5b9-4058-ad39-0a533dbeb0d5
+ssh.service active
+enabled
+ssh.socket active
+enabled
+docker active
+enabled
+containerd active
+enabled
+ufw active
+enabled
+account-relation-backup.timer active
+enabled
+  UNIT LOAD ACTIVE SUB DESCRIPTION
+
+0 loaded units listed.
+permitrootlogin no
+pubkeyauthentication yes
+passwordauthentication no
+kbdinteractiveauthentication no
+256 SHA256:<HOST_KEY_FINGERPRINT> root@server (ED25519)
+LOCAL_PASSWORD_STATUS=P
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
+
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere
+80/tcp                     ALLOW IN    Anywhere                   # Shared Caddy HTTP
+443/tcp                    ALLOW IN    Anywhere                   # Shared Caddy HTTPS
+22/tcp (v6)                ALLOW IN    Anywhere (v6)
+80/tcp (v6)                ALLOW IN    Anywhere (v6)              # Shared Caddy HTTP
+443/tcp (v6)               ALLOW IN    Anywhere (v6)              # Shared Caddy HTTPS
+
+State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+LISTEN 0      4096   127.0.0.53%lo:53        0.0.0.0:*    users:(("systemd-resolve",pid=450,fd=15))
+LISTEN 0      4096         0.0.0.0:443       0.0.0.0:*    users:(("docker-proxy",pid=1859,fd=8))
+LISTEN 0      4096         0.0.0.0:22        0.0.0.0:*    users:(("sshd",pid=1012,fd=3),("systemd",pid=1,fd=87))
+LISTEN 0      4096         0.0.0.0:80        0.0.0.0:*    users:(("docker-proxy",pid=1835,fd=8))
+LISTEN 0      4096      127.0.0.54:53        0.0.0.0:*    users:(("systemd-resolve",pid=450,fd=17))
+LISTEN 0      4096            [::]:443          [::]:*    users:(("docker-proxy",pid=1865,fd=8))
+LISTEN 0      4096            [::]:22           [::]:*    users:(("sshd",pid=1012,fd=4),("systemd",pid=1,fd=88))
+LISTEN 0      4096            [::]:80           [::]:*    users:(("docker-proxy",pid=1842,fd=8))
+app_status=running health=healthy restart=unless-stopped user=1000:1000 image=sha256:6b658dcc00cdb25bcfa83c9625f7daf0930fe720b7c87597b3496d933883995b published_ports={}
+proxy_status=running restart=unless-stopped user=1000:1000 published_ports={"8080/tcp":[{"HostIp":"","HostPort":"80"}],"8443/tcp":[{"HostIp":"","HostPort":"443"}]}
+SCHEMA 1 INTEGRITY ok
+admins 1
+accounts 0
+vault_meta 0
+{"ok":true}
+Timezone=Asia/Shanghai
+NTPSynchronized=yes
+NEXT                        LEFT LAST                        PASSED UNIT                          ACTIVATES
+Mon 2026-11-09 03:00:00 CST  11h Sun 2026-11-08 14:30:59 CST      - account-relation-backup.timer account-relation-backup.service
+
+1 timers listed.
+Pass --all to see loaded but inactive timers, too.
+PRODUCTION_REBOOT_AUDIT_PASS

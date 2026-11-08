@@ -1,0 +1,123 @@
+perl: warning: Setting locale failed.
+perl: warning: Please check that your locale settings:
+	LC_ALL = "C.UTF-8",
+	LC_CTYPE = "C.UTF-8",
+	LC_TERMINAL = "iTerm2",
+	LANG = "C.UTF-8"
+    are supported and installed on your system.
+perl: warning: Falling back to the standard locale ("C").
+source.tar.gz: OK
+RELEASE_MANIFEST_VERIFIED 4878342b4d9b5d1c44edb7cb3ee022cf69b365a0
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 930B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 244B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 125.20kB 0.0s done
+#4 DONE 0.0s
+
+#5 [dependencies 1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#5 resolve docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 0.0s done
+#5 extracting sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3
+#5 extracting sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3 1.0s done
+#5 DONE 1.1s
+
+#5 [dependencies 1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#5 extracting sha256:67dd44e03538482c8d0ffbd8e50ba292c566a215d908905b94069c2cc0583590 0.0s done
+#5 extracting sha256:0485e61ce4657409e991d0f4164383df7d64c2b6b074b45324c8dae73935ba38
+#5 extracting sha256:0485e61ce4657409e991d0f4164383df7d64c2b6b074b45324c8dae73935ba38 1.4s done
+#5 DONE 2.5s
+
+#5 [dependencies 1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#5 extracting sha256:ed61b9f2bb56ed1684866e971964fa114c1fcab4b4c671795f9eb91183282bb8 0.1s done
+#5 extracting sha256:f3db01672604e7946d0e84f5d03bcff2478a5aaff2852a87241a2a3fd9ddd13f 0.0s done
+#5 DONE 2.6s
+
+#6 [dependencies 2/4] WORKDIR /app
+#6 DONE 0.4s
+
+#7 [dependencies 3/4] COPY package.json package-lock.json ./
+#7 DONE 0.0s
+
+#8 [dependencies 4/4] RUN npm ci --omit=dev && npm cache clean --force
+#8 2.524 npm error code 1
+#8 2.524 npm error path /app/node_modules/better-sqlite3
+#8 2.524 npm error command failed
+#8 2.524 npm error command sh -c node-gyp rebuild
+#8 2.530 npm error gyp info it worked if it ends with ok
+#8 2.530 npm error gyp info using node-gyp@12.4.0
+#8 2.530 npm error gyp info using node@24.22.2 | linux | x64
+#8 2.530 npm error gyp ERR! find Python
+#8 2.530 npm error gyp ERR! find Python --python was not set on the command line
+#8 2.530 npm error gyp ERR! find Python Python is not set from environment variable PYTHON
+#8 2.530 npm error gyp ERR! find Python checking if "python3" can be used
+#8 2.530 npm error gyp ERR! find Python - executable path is ""
+#8 2.530 npm error gyp ERR! find Python - "" could not be run
+#8 2.530 npm error gyp ERR! find Python checking if "python" can be used
+#8 2.530 npm error gyp ERR! find Python - executable path is ""
+#8 2.530 npm error gyp ERR! find Python - "" could not be run
+#8 2.530 npm error gyp ERR! find Python
+#8 2.530 npm error gyp ERR! find Python **********************************************************
+#8 2.530 npm error gyp ERR! find Python You need to install the latest version of Python.
+#8 2.530 npm error gyp ERR! find Python Node-gyp should be able to find and use Python. If not,
+#8 2.530 npm error gyp ERR! find Python you can try one of the following options:
+#8 2.530 npm error gyp ERR! find Python - Use the switch --python="/path/to/pythonexecutable"
+#8 2.530 npm error gyp ERR! find Python (accepted by both node-gyp and npm)
+#8 2.530 npm error gyp ERR! find Python - Set the environment variable PYTHON
+#8 2.530 npm error gyp ERR! find Python For more information consult the documentation at:
+#8 2.530 npm error gyp ERR! find Python https://github.com/nodejs/node-gyp#installation
+#8 2.530 npm error gyp ERR! find Python **********************************************************
+#8 2.530 npm error gyp ERR! find Python
+#8 2.530 npm error gyp ERR! configure error
+#8 2.530 npm error gyp ERR! stack Error: Could not find any Python installation to use
+#8 2.530 npm error gyp ERR! stack at PythonFinder.fail (/usr/local/lib/node_modules/npm/node_modules/node-gyp/lib/find-python.js:300:11)
+#8 2.530 npm error gyp ERR! stack at PythonFinder.findPython (/usr/local/lib/node_modules/npm/node_modules/node-gyp/lib/find-python.js:160:17)
+#8 2.530 npm error gyp ERR! stack at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+#8 2.530 npm error gyp ERR! stack at async configure (/usr/local/lib/node_modules/npm/node_modules/node-gyp/lib/configure.js:27:18)
+#8 2.530 npm error gyp ERR! stack at async run (/usr/local/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js:81:18)
+#8 2.530 npm error gyp ERR! System Linux 6.8.0-149-generic
+#8 2.530 npm error gyp ERR! command "/usr/local/bin/node" "/usr/local/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js" "rebuild"
+#8 2.530 npm error gyp ERR! cwd /app/node_modules/better-sqlite3
+#8 2.530 npm error gyp ERR! node -v v24.22.2
+#8 2.530 npm error gyp ERR! node-gyp -v v12.4.0
+#8 2.530 npm error gyp ERR! $npm_package_name better-sqlite3
+#8 2.530 npm error gyp ERR! $npm_package_version 13.0.3
+#8 2.530 npm error gyp ERR! not ok
+#8 2.531 npm notice
+#8 2.531 npm notice New major version of npm available! 11.19.1 -> 12.2.2
+#8 2.531 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+#8 2.531 npm notice To update run: npm install -g npm@12.2.2
+#8 2.531 npm notice
+#8 2.532 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-08T06_25_11_331Z-debug-0.log
+#8 ERROR: process "/bin/sh -c npm ci --omit=dev && npm cache clean --force" did not complete successfully: exit code: 1
+------
+ > [dependencies 4/4] RUN npm ci --omit=dev && npm cache clean --force:
+2.530 npm error gyp ERR! node-gyp -v v12.4.0
+2.530 npm error gyp ERR! $npm_package_name better-sqlite3
+2.530 npm error gyp ERR! $npm_package_version 13.0.3
+2.530 npm error gyp ERR! not ok
+2.531 npm notice
+2.531 npm notice New major version of npm available! 11.19.1 -> 12.2.2
+2.531 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+2.531 npm notice To update run: npm install -g npm@12.2.2
+2.531 npm notice
+2.532 npm error A complete log of this run can be found in: /root/.npm/_logs/2026-11-08T06_25_11_331Z-debug-0.log
+------
+Dockerfile:4
+--------------------
+   2 |     WORKDIR /app
+   3 |     COPY package.json package-lock.json ./
+   4 | >>> RUN npm ci --omit=dev && npm cache clean --force
+   5 |
+   6 |     FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c npm ci --omit=dev && npm cache clean --force" did not complete successfully: exit code: 1

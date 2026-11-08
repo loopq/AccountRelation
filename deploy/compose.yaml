@@ -1,0 +1,32 @@
+name: account-relation
+services:
+  app:
+    image: ${APP_IMAGE:?Set immutable release image tag}
+    platform: linux/amd64
+    user: "1000:1000"
+    init: true
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 100
+    tmpfs: ["/tmp:size=16m,mode=1777"]
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      APP_ORIGIN: https://account.loopq.cn
+      DATABASE_PATH: /data/account.db
+    volumes:
+      - /var/lib/account-relation:/data
+    networks:
+      account:
+        aliases: [account-relation-app]
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+networks:
+  account:
+    name: account-relation-private
+    external: true

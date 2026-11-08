@@ -1,0 +1,13 @@
+
+> account-relation@1.0.0 test:browser
+> playwright test
+
+
+Running 2 tests using 1 worker
+
+(node:2750) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 test/browser.spec.js:10:1 › full user workflow and no plaintext in API/storage; desktop and mobile (4.5s)
+  ✓  2 test/browser.spec.js:62:1 › legacy service worker and sensitive cache removed before new API calls (2.5s)
+
+  2 passed (8.0s)
