@@ -2,13 +2,13 @@
   "config": {
     "argv": [
       "/opt/homebrew/Cellar/node/25.6.0/bin/node",
-      "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/node_modules/.bin/playwright",
+      "<ACCOUNT_RELATION_REPO>/node_modules/.bin/playwright",
       "test",
       "-c",
       "/tmp/ag-pw/chrome.config.mjs"
     ],
     "configFile": "/tmp/ag-pw/chrome.config.mjs",
-    "rootDir": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/test",
+    "rootDir": "<ACCOUNT_RELATION_REPO>/test",
     "failOnFlakyTests": false,
     "forbidOnly": false,
     "fullyParallel": false,
@@ -32,7 +32,7 @@
         },
         "id": "",
         "name": "",
-        "testDir": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/test",
+        "testDir": "<ACCOUNT_RELATION_REPO>/test",
         "testIgnore": [],
         "testMatch": [
           "browser.spec.js"
@@ -51,8 +51,8 @@
           "actualWorkers": 1
         },
         "name": "",
-        "testDir": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/test",
-        "snapshotDir": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/test",
+        "testDir": "<ACCOUNT_RELATION_REPO>/test",
+        "snapshotDir": "<ACCOUNT_RELATION_REPO>/test",
         "testIgnore": [],
         "testMatch": "browser.spec.js",
         "timeout": 60000,
@@ -78,7 +78,7 @@
       [
         "json",
         {
-          "outputFile": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/docs/agents/browser-test-results.json"
+          "outputFile": "<ACCOUNT_RELATION_REPO>/docs/agents/browser-test-results.json"
         }
       ]
     ],
@@ -97,7 +97,7 @@
       "url": "http://127.0.0.1:3107/health",
       "reuseExistingServer": false,
       "timeout": 30000,
-      "cwd": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview"
+      "cwd": "<ACCOUNT_RELATION_REPO>"
     }
   },
   "suites": [

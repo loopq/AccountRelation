@@ -4,6 +4,8 @@
 
 最新增量（2026-11-10，taskboard #10）：已发布 `bae6614337d5430f9505`（git `d3dcbcc`）。新增两项功能：一是记录每个 Email 账号登录在哪几台设备上，每台设备软上限 5 个，超了变红、保存前确认，仍可保存；Email 列可按设备筛选。二是卡片上的 👁 弹出概况：完整备注、关联到它的账号、创建/更新时间，不解密任何字段。生产库已从 schema 1 自动迁移到 2，只新增了 `devices` 和 `account_devices` 两张空表。保险库、revision、24 个账号、平台、国家的内容指纹跟发布前完全一致，integrity ok，没有外键违规。预发布备份 `predeploy-20261110T064249Z.db` 已核对：v1，内容与发布前一致。**回滚注意**：旧镜像拒绝打开 v2 库，回退到 `53f4acdd93dd9e9a742e` 前必须先恢复这份备份。本机验证 6 组接口测试、v1→v2 迁移检查和 2 条浏览器流程都通过，浏览器测试用的是本机 Chrome。公网 `app.js` / `index.html` 与源码哈希一致。核对过程中有 1 次本机链路 TLS 偶发失败，重试 10/10 通过，如实记录在日志里。全程未登录，未写入 vault。详见 [增量部署日志](device-login-preview-deployment.log)、[数据核对](device-login-preview-data-audit.log)、[公网核对](device-login-preview-public.log)、[执行评审](account-device-login-preview-exec-review.md)。
 
+分支统一（2026-11-10）：`feat/self-hosted-web` 已快进合入 `main` 后删除。`mobile-impl` 早已合入 main，一并删除。以后线上分支就是 `main`，`scripts/deploy.sh` 在 main 上运行发布。本文和其他历史记录里的分支名保留当时原样，不回改。
+
 此前增量（2026-11-08）：用户要求保险库主密码最低长度降为 6 个字符，现已发布 `53f4acdd93dd9e9a742e`。首次设置和修改均支持 6 位纯数字，5 位会拒绝；登录密码规则未改。2 条浏览器流程、5 组接口测试、公网脚本校验通过，保险库与账号数据核对无变化。详见 [增量部署日志](vault-password-six-deployment.log)、[浏览器测试](vault-password-six-browser.log)、[公网验收](vault-password-six-public.log)、[数据核对](vault-password-six-data-audit.log)。下文版本为首次部署历史记录。
 
 ## 1. 交付版本与范围

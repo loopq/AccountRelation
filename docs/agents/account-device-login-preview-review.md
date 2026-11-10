@@ -1,6 +1,6 @@
 # Plan Review: account-device-login-preview
 
-**Plan File**: /Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/docs/agents/account-device-login-preview.md
+**Plan File**: docs/agents/account-device-login-preview.md
 **Reviewer**: Gemini
 
 ---
