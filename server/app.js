@@ -59,7 +59,7 @@ export async function createApp(store, { origin = 'http://127.0.0.1:3000', produ
   app.post('/api/accounts/import',mutation(z.array(v.account).min(1).max(1000),rows => rows.map(row => store.saveAccount(row))));
   app.patch('/api/accounts/:id',mutation(v.account.partial(),(d,req) => store.saveAccount(d,v.parse(v.uuid,req.params.id))));
   app.delete('/api/accounts/:id',mutation(z.null(),(_d,req) => store.deleteAccount(v.parse(v.uuid,req.params.id))));
-  for (const [table,schema] of [['platforms',v.platform],['countries',v.country]]) {
+  for (const [table,schema] of [['platforms',v.platform],['countries',v.country],['devices',v.device]]) {
     app.post(`/api/${table}`,mutation(schema,d => store.saveLookup(table,d)));
     app.delete(`/api/${table}/:id`,mutation(z.null(),(_d,req) => store.deleteLookup(table,v.parse(v.uuid,req.params.id))));
   }

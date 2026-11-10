@@ -9,7 +9,8 @@ for (const storage of [localStorage, sessionStorage]) {
 }
 const connState = document.getElementById('connState');
 let masterKey = null, unlockedSalt = null, epoch = 0, copiedByApp = false;
-const emptyState = () => ({ accounts:[],platforms:[],countries:[],vault:null,revision:0 });
+const emptyState = () => ({ accounts:[],platforms:[],countries:[],devices:[],vault:null,revision:0 });
+const DEVICE_CAP = 5;
 function context() {
   if (!masterKey) throw new Error('请先解锁');
   return { key:masterKey,salt:unlockedSalt,revision:state.revision,epoch };
@@ -52,6 +53,9 @@ async function unlock(password) {
 }
 function clearSensitive() {
   epoch++; masterKey = null; unlockedSalt = null; state = emptyState();
+  const peek = document.getElementById('peek');
+  peek.togglePopover?.(false);
+  peek.replaceChildren();
   closeDrawer(); sdrawer.classList.remove('open');
   document.getElementById('sdrawerBody').replaceChildren();
   document.getElementById('mpw').value = '';
@@ -87,6 +91,9 @@ let state = emptyState();
 const platformById = (id) => state.platforms.find(p => p.id === id);
 const countryById = (id) => state.countries.find(c => c.id === id);
 const accountById = (id) => state.accounts.find(a => a.id === id);
+const deviceById = (id) => state.devices.find(d => d.id === id);
+const deviceCount = (id) => state.accounts.filter(a => a.device_ids?.includes(id)).length;
+const devInUse = (id) => state.accounts.some(a => a.device_ids?.includes(id));
 
 function toast(msg) {
   const t = document.getElementById("toast");
@@ -132,18 +139,50 @@ function emailOf(a) {
   return e ? e.name : null;
 }
 
+let devFilter = '';
+function matchDevFilter(a) {
+  if (!devFilter) return true;
+  const ids = a.device_ids || [];
+  if (devFilter === '__none') return ids.length === 0;
+  return ids.includes(devFilter);
+}
+function devFilterBar() {
+  const bar = document.createElement('div');
+  bar.className = 'dev-filter';
+  const opt = (v, label) => `<option value="${esc(v)}" ${devFilter === v ? 'selected' : ''}>${label}</option>`;
+  const devOpts = state.devices.map(d => {
+    const n = deviceCount(d.id);
+    return opt(d.id, `${esc(d.name)}（${n}/${DEVICE_CAP}）${n > DEVICE_CAP ? ' ⚠' : ''}`);
+  }).join('');
+  bar.innerHTML = `<select aria-label="按设备筛选">${opt('', '全部设备')}${opt('__none', '未登录任何设备')}${devOpts}</select>`;
+  bar.querySelector('select').onchange = (e) => { devFilter = e.target.value; render(); };
+  return bar;
+}
+
 function render() {
+  if (devFilter && devFilter !== '__none' && !deviceById(devFilter)) devFilter = '';
   for (const cat of ['email', 'apple', 'ai']) {
-    const list = state.accounts.filter(a => a.category === cat);
+    const all = state.accounts.filter(a => a.category === cat);
+    const list = cat === 'email' ? all.filter(matchDevFilter) : all;
     const cnt = list.length ? `· ${list.length}` : '';
     document.getElementById('count-' + cat).textContent = cnt;
     document.getElementById('tab-count-' + cat).textContent = cnt;
     const box = document.getElementById('col-' + cat);
-    if (!list.length) {
+    if (!all.length) {
       box.innerHTML = `<div class="col-empty">暂无${CAT_LABEL[cat].replace(/^.\s/, '')}账号<br>点上方「+ 账号」添加</div>`;
       continue;
     }
     box.innerHTML = '';
+    if (cat === 'email' && state.devices.length) {
+      box.appendChild(devFilterBar());
+    }
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'col-empty';
+      empty.textContent = '该筛选下暂无账号';
+      box.appendChild(empty);
+      continue;
+    }
     list.forEach(a => box.appendChild(renderCard(a)));
   }
 }
@@ -165,12 +204,15 @@ function renderCard(a) {
   }
 
   const showCountryPhone2fa = a.category === 'email' || a.category === 'apple';
+  // 按设置里的设备顺序显示（device_ids 本身按 id 排序）
+  const devNames = a.category === 'email' ? state.devices.filter(d => a.device_ids?.includes(d.id))
+    .map(d => `<span class="${deviceCount(d.id) > DEVICE_CAP ? 'over' : ''}">${esc(d.name)}</span>`).join(', ') : '';
 
   card.innerHTML = `
     <div class="ctop">
       <div>
         <div class="plat">${esc(plat ? plat.name : '—')}</div>
-        <div class="name">${esc(a.name)}</div>
+        <div class="name">${esc(a.name)} <button type="button" class="peek-btn" aria-label="预览概况">👁</button></div>
       </div>
       <span class="edit" data-edit="${a.id}">编辑 ›</span>
     </div>
@@ -178,6 +220,7 @@ function renderCard(a) {
     <div class="meta">
       ${showCountryPhone2fa && a.phone ? `<b>手机</b> ${esc(a.phone)} ${a.twofa_enabled ? '<span class="twofa-on">· 2FA✓</span>' : ''}<br>`
         : (showCountryPhone2fa && a.twofa_enabled ? '<span class="twofa-on">2FA✓</span><br>' : '')}
+      ${devNames ? `<b>设备</b> ${devNames}<br>` : ''}
       ${a.recovery_email ? `<b>辅邮</b> ${esc(a.recovery_email)}<br>` : ''}
       ${a.encrypted_password ? '<span class="haspw"><b>密码</b> 已加密 ✓</span><br>' : '<span style="opacity:.6">无密码</span><br>'}
       ${a.encrypted_2fa ? '<span class="haspw"><b>2FA密钥</b> 已加密 ✓</span><br>' : ''}
@@ -190,6 +233,11 @@ function renderCard(a) {
     </div>`;
 
   card.querySelector('[data-edit]').onclick = () => openForm(a);
+  const peek = document.getElementById('peek');
+  card.querySelector('.peek-btn').onclick = () => {
+    fillPeek(a);
+    peek.togglePopover?.(true);
+  };
   card.querySelectorAll('[data-goto]').forEach(el => el.onclick = () => {
     const t = accountById(el.dataset.goto); if (t) openForm(t);
   });
@@ -209,6 +257,42 @@ function renderCard(a) {
     catch { toast('解密失败(主密码不一致?)'); }
   };
   return card;
+}
+
+function fillPeek(a) {
+  const plat = platformById(a.platform_id);
+  const platName = plat ? plat.name : '—';
+  const inbound = state.accounts.filter(x => x.register_email_id === a.id || x.subscribe_apple_id === a.id);
+  let relHtml = '';
+  if (inbound.length) {
+    relHtml = `<div class="peek-sec"><div class="peek-lbl">关联到它的账号</div>`;
+    for (const x of inbound) {
+      const tag = CAT_LABEL[x.category] || x.category;
+      const relTypes = [];
+      if (x.register_email_id === a.id) relTypes.push('注册');
+      if (x.subscribe_apple_id === a.id) relTypes.push('订阅');
+      relHtml += `<div class="peek-rel-item"><span style="color:${CAT_COLOR[x.category]}">${esc(tag)}</span> ${esc(x.name)} · ${esc(relTypes.join('|'))}</div>`;
+    }
+    relHtml += `</div>`;
+  }
+  const cTime = a.created_at ? new Date(a.created_at).toLocaleString('zh-CN', { hour12: false }) : '—';
+  const uTime = a.updated_at ? new Date(a.updated_at).toLocaleString('zh-CN', { hour12: false }) : '—';
+  const noteHtml = a.note ? `<div class="peek-note">${esc(a.note)}</div>` : `<div class="peek-note peek-empty">无备注</div>`;
+  const peekEl = document.getElementById('peek');
+  peekEl.innerHTML = `
+    <div class="peek-head">
+      <div class="peek-plat">${esc(platName)}</div>
+      <div class="peek-name">${esc(a.name)}</div>
+    </div>
+    <div class="peek-sec">
+      <div class="peek-lbl">备注</div>
+      ${noteHtml}
+    </div>
+    ${relHtml}
+    <div class="peek-sec">
+      <div class="peek-time">创建时间：${esc(cTime)}</div>
+      <div class="peek-time">更新时间：${esc(uTime)}</div>
+    </div>`;
 }
 
 // ============ 账号表单（drawer，动态字段） ============
@@ -247,12 +331,26 @@ function openForm(a) {
   const isNew = !a || !a.id;
   a = a || {};
   document.getElementById('drawerTitle').textContent = isNew ? '新增账号' : '编辑账号';
+  const curDevIds = a.device_ids || [];
+  const devOptionsHtml = state.devices.length ? state.devices.map(d => {
+    const cnt = deviceCount(d.id);
+    const checked = curDevIds.includes(d.id) ? 'checked' : '';
+    return `<label><input type="checkbox" value="${esc(d.id)}" ${checked}> ${esc(d.name)} <span class="${cnt > DEVICE_CAP ? 'over' : ''}">${cnt}/${DEVICE_CAP}</span></label>`;
+  }).join('') : '<div class="hint">先在 ⚙ 设置 → 设备管理 添加设备</div>';
+
   const body = document.getElementById('drawerBody');
   body.innerHTML = `
     <label>平台 *</label>
     <select id="f-platform">${platformOptions(a.platform_id)}</select>
     <label>账号名 *</label>
     <input id="f-name" value="${esc(a.name || '')}" placeholder="账号显示名">
+
+    <div class="field-devices">
+      <label>登录设备（多选）</label>
+      <div class="dev-list">
+        ${devOptionsHtml}
+      </div>
+    </div>
 
     <div class="field-email-apple">
       <label>绑定手机号</label>
@@ -301,6 +399,7 @@ function openForm(a) {
   const applyCat = () => {
     const p = platformById(platSel.value);
     const cat = p ? p.category : null;
+    body.querySelector('.field-devices').classList.toggle('hidden', cat !== 'email');
     body.querySelector('.field-email-apple').classList.toggle('hidden', !(cat === 'email' || cat === 'apple'));
     body.querySelector('.field-register').classList.toggle('hidden', !(cat === 'apple' || cat === 'ai'));
     body.querySelector('.field-subscribe').classList.toggle('hidden', cat !== 'ai');
@@ -373,6 +472,25 @@ async function saveAccount(a, isNew, ctx) {
   } else {
     row.encrypted_2fa = null;
   }
+
+  const devIds = cat === 'email'
+    ? Array.from(body.querySelectorAll('.field-devices input[type=checkbox]:checked')).map(cb => cb.value)
+    : [];
+  const oldDevIds = a.device_ids || [];
+  const overList = [];
+  for (const did of devIds) {
+    if (!oldDevIds.includes(did)) {
+      const cnt = deviceCount(did);
+      if (cnt + 1 > DEVICE_CAP) {
+        const d = deviceById(did);
+        overList.push(`${d ? d.name : did}(${cnt + 1}/${DEVICE_CAP})`);
+      }
+    }
+  }
+  if (overList.length > 0) {
+    if (!confirm(`以下设备登录账号数将超过上限：\n${overList.join('、')}\n是否仍要保存？`)) return;
+  }
+  row.device_ids = devIds;
 
   await mutate(isNew ? '/accounts' : '/accounts/'+a.id,isNew ? 'POST' : 'PATCH',row,ctx);
   closeDrawer(); await loadAll(); toast(isNew ? '已新增' : '已保存');
@@ -452,6 +570,16 @@ function renderSettings() {
       <input id="newCtryName" placeholder="国家/地区名" style="flex:1">
       <button class="mini" id="addCtry" style="flex:none">+ 加</button>
     </div>
+    <label>设备管理</label>`;
+  for (const d of state.devices) {
+    const cnt = deviceCount(d.id);
+    html += `<div class="mrow"><span class="mname">${esc(d.name)} · <span class="${cnt > DEVICE_CAP ? 'over' : ''}">${cnt}/${DEVICE_CAP}</span></span>
+      <button class="mini ghost" data-del-dev="${d.id}">删</button></div>`;
+  }
+  html += `<div class="add-row">
+      <input id="newDevName" placeholder="设备名" style="flex:1">
+      <button class="mini" id="addDev" style="flex:none">+ 加</button>
+    </div>
     <label>更改主密码</label>
     <input type="password" id="curMpw" placeholder="当前主密码（验证身份）">
     <input type="password" id="newMpw1" placeholder="新主密码" style="margin-top:6px">
@@ -473,8 +601,10 @@ function renderSettings() {
   body.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => setTheme(b.dataset.themeSet));
   body.querySelectorAll('[data-del-plat]').forEach(b => b.onclick = () => delPlatform(b.dataset.delPlat));
   body.querySelectorAll('[data-del-ctry]').forEach(b => b.onclick = () => delCountry(b.dataset.delCtry));
+  body.querySelectorAll('[data-del-dev]').forEach(b => b.onclick = () => delDevice(b.dataset.delDev));
   body.querySelector('#addPlat').onclick = addPlatform;
   body.querySelector('#addCtry').onclick = addCountry;
+  body.querySelector('#addDev').onclick = addDevice;
   body.querySelector('#changeMpw').onclick = () => doChangeMasterPassword().catch(e=>toast(e.message));
   body.querySelector('#importBtn').onclick = doBatchImport;
 }
@@ -504,6 +634,18 @@ async function delCountry(id) {
   if (ctryInUse(id)) return toast('有账号在用此国家，不能删');
   try { await mutate('/countries/'+id,'DELETE',null); } catch(e) { return toast(e.message); }
   await loadAll(); renderSettings(); toast('国家已删除');
+}
+async function addDevice() {
+  const name = document.getElementById('newDevName').value.trim();
+  if (!name) return toast('设备名必填');
+  const sort = Math.max(0, ...state.devices.map(d => d.sort)) + 1;
+  try { await mutate('/devices','POST',{ name,sort }); } catch(e) { return toast(e.message); }
+  await loadAll(); renderSettings(); toast('设备已添加');
+}
+async function delDevice(id) {
+  if (devInUse(id)) return toast('有账号在用此设备，不能删');
+  try { await mutate('/devices/'+id,'DELETE',null); } catch(e) { return toast(e.message); }
+  await loadAll(); renderSettings(); toast('设备已删除');
 }
 
 // ---- 更改主密码（全量重加密，RPC 事务原子）----

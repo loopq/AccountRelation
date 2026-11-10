@@ -85,6 +85,27 @@
   .link:hover { text-decoration: underline; }
   .twofa-on { color: var(--ok); }
   .haspw { color: var(--ok); }
+  .over { color: var(--danger); }
+  .dev-filter { position: sticky; top: 0; margin: -10px -10px 10px -10px; padding: 10px 10px 4px 10px; background: var(--bg); z-index: 5; }
+  .dev-filter select { width: 100%; }
+  .dev-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .dev-list label { display: flex; align-items: center; gap: 8px; margin: 0; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--ink); cursor: pointer; }
+  .dev-list input { width: auto; }
+  .dev-list span { font-size: 10px; color: var(--ink-dim); margin-left: 2px; }
+  .dev-list span.over { color: var(--danger); font-weight: 600; }
+  .peek-btn { background: transparent; border: none; padding: 0 3px; cursor: pointer; font-size: 11px; vertical-align: middle; line-height: 1; color: var(--ink-dim); }
+  .peek-btn:hover { color: var(--accent); border: none; }
+  #peek { margin: auto; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; width: min(340px, calc(100% - 32px)); max-height: 70vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+  #peek::backdrop { background: rgba(0, 0, 0, 0.4); pointer-events: none; }
+  .peek-head { margin-bottom: 10px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+  .peek-plat { font-size: 10px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .peek-name { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .peek-sec { margin-top: 10px; }
+  .peek-lbl { font-size: 10px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
+  .peek-note { font-size: 12px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+  .peek-empty { color: var(--ink-dim); }
+  .peek-rel-item { font-size: 11px; line-height: 1.6; }
+  .peek-time { font-size: 10px; color: var(--ink-dim); line-height: 1.5; }
   .quick { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
   .quick button { flex: 1; min-width: 58px; }
   /* drawer 表单 */
@@ -234,6 +255,7 @@
   <div class="drawer-body" id="sdrawerBody"></div>
 </div>
 
+<div id="peek" popover></div>
 <div id="toast"></div>
 
 <script type="module" src="/app.js"></script>

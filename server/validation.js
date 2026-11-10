@@ -19,11 +19,14 @@ export const account = z.strictObject({
   encrypted_password: cipher.nullable().optional(), encrypted_2fa: cipher.nullable().optional(),
   phone: text(100), twofa_enabled: z.boolean().optional(), country_id: ref,
   register_email_id: ref, subscribe_apple_id: ref, note: text(10000), recovery_email: text(320),
+  device_ids: z.array(uuid).max(100).optional(),
 });
 export const platform = z.strictObject({ category, name: z.string().trim().min(1).max(100),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(), sort: z.number().int().min(0).max(100000).optional() });
 export const country = z.strictObject({ name: z.string().trim().min(1).max(100),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/), sort: z.number().int().min(0).max(100000).optional() });
+export const device = z.strictObject({ name: z.string().trim().min(1).max(100),
+  sort: z.number().int().min(0).max(100000).optional() });
 export const change = z.strictObject({ expectedRevision: z.number().int().nonnegative(), expectedSalt: salt.nullable() });
 export const initVault = z.strictObject({ salt, canary: cipher });
 export const rotation = z.strictObject({ salt, canary: cipher,

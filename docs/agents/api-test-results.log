@@ -2,17 +2,18 @@
 > account-relation@1.0.0 test
 > node --test test/*.test.js
 
-✔ authentication, CSRF, cookies, validation, host and static boundaries (543.046917ms)
-✔ rate limiting, session expiry, admin singleton and reset revocation (898.674541ms)
+✔ authentication, CSRF, cookies, validation, host and static boundaries (660.007917ms)
+✔ rate limiting, session expiry, admin singleton and reset revocation (1075.569917ms)
 request_failed SQLITE_CONSTRAINT_TRIGGER
-✔ CRUD relationships, import atomicity, optimistic writes and complete key rotation (409.159542ms)
-✔ empty-vault rotation and racing initialization (409.315292ms)
-✔ non-exportable keys, random IVs, authentication and online WAL backup restore (223.727667ms)
-ℹ tests 5
+✔ CRUD relationships, import atomicity, optimistic writes and complete key rotation (490.025958ms)
+✔ empty-vault rotation and racing initialization (487.670708ms)
+✔ devices CRUD, account device links, schema v2 and foreign keys (401.1235ms)
+✔ non-exportable keys, random IVs, authentication and online WAL backup restore (255.35625ms)
+ℹ tests 6
 ℹ suites 0
-ℹ pass 5
+ℹ pass 6
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 2430.629084
+ℹ duration_ms 3335.561209

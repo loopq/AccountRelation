@@ -1,12 +1,14 @@
 {
   "config": {
     "argv": [
-      "/opt/homebrew/Cellar/node/25.9.0_2/bin/node",
-      "<ACCOUNT_RELATION_REPO>/node_modules/.bin/playwright",
-      "test"
+      "/opt/homebrew/Cellar/node/25.6.0/bin/node",
+      "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/node_modules/.bin/playwright",
+      "test",
+      "-c",
+      "/tmp/ag-pw/chrome.config.mjs"
     ],
-    "configFile": "<ACCOUNT_RELATION_REPO>/playwright.config.js",
-    "rootDir": "<ACCOUNT_RELATION_REPO>/test",
+    "configFile": "/tmp/ag-pw/chrome.config.mjs",
+    "rootDir": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/test",
     "failOnFlakyTests": false,
     "forbidOnly": false,
     "fullyParallel": false,
@@ -22,7 +24,7 @@
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "<ACCOUNT_RELATION_REPO>/test-results",
+        "outputDir": "/tmp/ag-pw/results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -30,7 +32,7 @@
         },
         "id": "",
         "name": "",
-        "testDir": "<ACCOUNT_RELATION_REPO>/test",
+        "testDir": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/test",
         "testIgnore": [],
         "testMatch": [
           "browser.spec.js"
@@ -42,15 +44,15 @@
       {
         "grep": {},
         "grepInvert": null,
-        "outputDir": "<ACCOUNT_RELATION_REPO>/test-results",
+        "outputDir": "/tmp/ag-pw/results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
           "actualWorkers": 1
         },
         "name": "",
-        "testDir": "<ACCOUNT_RELATION_REPO>/test",
-        "snapshotDir": "<ACCOUNT_RELATION_REPO>/test",
+        "testDir": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/test",
+        "snapshotDir": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/test",
         "testIgnore": [],
         "testMatch": "browser.spec.js",
         "timeout": 60000,
@@ -59,7 +61,8 @@
           "headless": true,
           "actionTimeout": 10000,
           "screenshot": "only-on-failure",
-          "trace": "retain-on-failure"
+          "trace": "retain-on-failure",
+          "channel": "chrome"
         },
         "dependencies": [],
         "ignoreSnapshots": false,
@@ -75,7 +78,7 @@
       [
         "json",
         {
-          "outputFile": "docs/agents/browser-test-results.json"
+          "outputFile": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview/docs/agents/browser-test-results.json"
         }
       ]
     ],
@@ -93,7 +96,8 @@
       "command": "node test/browser-server.js",
       "url": "http://127.0.0.1:3107/health",
       "reuseExistingServer": false,
-      "timeout": 30000
+      "timeout": 30000,
+      "cwd": "/Users/loopq/dev/worktrees/AccountRelation/feat/self-hosted-web_device-login-preview"
     }
   },
   "suites": [
@@ -119,12 +123,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 4557,
+                  "duration": 6621,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-08T07:32:40.692Z",
+                  "startTime": "2026-11-10T06:28:45.288Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -153,12 +157,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2538,
+                  "duration": 2585,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-08T07:32:45.525Z",
+                  "startTime": "2026-11-10T06:28:52.567Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -168,7 +172,7 @@
           ],
           "id": "254a68b5fae918765be2-5906311f75f9e95764b1",
           "file": "browser.spec.js",
-          "line": 71,
+          "line": 134,
           "column": 1
         }
       ]
@@ -176,8 +180,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-08T07:32:39.471Z",
-    "duration": 8744.262999999999,
+    "startTime": "2026-11-10T06:28:44.081Z",
+    "duration": 11163.1,
     "expected": 2,
     "skipped": 0,
     "unexpected": 0,

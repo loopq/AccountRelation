@@ -10,7 +10,11 @@ async function unlock(page,pw) {await page.locator('#mpw').fill(pw);await page.l
 test('full user workflow and no plaintext in API/storage; desktop and mobile',async({page,context})=>{
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const bodies=[];page.on('request',r=>{if(r.url().includes('/api/') && !r.url().endsWith('/login')) bodies.push(r.postData() || '');});
-  page.on('dialog',dialog=>dialog.accept());
+  let dismissNextDialog = false;
+  page.on('dialog', dialog => {
+    if (dismissNextDialog) { dismissNextDialog = false; dialog.dismiss(); }
+    else dialog.accept();
+  });
   await login(page);
   await page.locator('#mpw').fill('73194');await page.locator('#unlockBtn').click();
   await expect(page.locator('#lockErr')).toHaveText('首次主密码至少 6 个字符');
@@ -33,6 +37,10 @@ test('full user workflow and no plaintext in API/storage; desktop and mobile',as
   expect(JSON.stringify(storage)).not.toMatch(/ag_masterkey|fake-account-secret|fake-totp-seed/);
   await page.locator('#settings').click();
   await page.locator('[data-theme-set="light"]').click();await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+  await page.locator('#newDevName').fill('Dev Alpha');await page.locator('#addDev').click();
+  await expect(page.locator('#sdrawerBody')).toContainText('Dev Alpha · 0/5');
+  await page.locator('#newDevName').fill('Dev Beta');await page.locator('#addDev').click();
+  await expect(page.locator('#sdrawerBody')).toContainText('Dev Beta · 0/5');
   await page.locator('#importJson').fill(JSON.stringify([{platform:'OpenAI',name:'fake AI',password:'fake-import-secret-333'}]));
   await page.locator('#importBtn').click();await expect(page.locator('#importMsg')).toContainText('已导入 1 条');
   const beforeRejectedRotation=await page.evaluate(async()=>(await fetch('/api/state')).json());
@@ -45,9 +53,64 @@ test('full user workflow and no plaintext in API/storage; desktop and mobile',as
   await unlock(page,nextMaster);
   await page.locator('#col-email [data-edit]').click();await expect(page.locator('#f-2fakey')).toHaveValue('fake-totp-seed-222');
   await page.locator('#f-pw').fill('');await page.locator('#f-save').click();await expect(page.locator('#col-email [data-cp-pass]')).toBeDisabled();
+  await page.locator('#col-email [data-edit]').click();
+  await page.locator('.field-devices label:has-text("Dev Alpha") input').check();
+  await page.locator('.field-devices label:has-text("Dev Beta") input').check();
+  await page.locator('#f-save').click();
+  await expect(page.locator('#col-email .card .meta')).toContainText('设备 Dev Alpha, Dev Beta');
+  await page.evaluate(async()=>{
+    const s=await (await fetch('/api/state')).json();const g=s.platforms.find(p=>p.name==='Gmail');const da=s.devices.find(d=>d.name==='Dev Alpha');
+    const csrf=(await (await fetch('/api/session')).json()).csrf;
+    for(let i=1;i<=4;i++){
+      const cur=await (await fetch('/api/state')).json();
+      await fetch('/api/accounts',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},
+        body:JSON.stringify({expectedRevision:cur.revision,expectedSalt:cur.vault.salt,data:{category:'email',platform_id:g.id,name:`extra${i}@example.test`,device_ids:[da.id]}})});
+    }
+  });
+  await page.reload();await unlock(page,nextMaster);
+  await page.locator('#add').click();await page.locator('#f-platform').selectOption({label:'Gmail'});
+  await page.locator('#f-name').fill('sixth@example.test');
+  await page.locator('.field-devices label:has-text("Dev Alpha") input').check();
+  dismissNextDialog=true;await page.locator('#f-save').click();await expect(page.locator('#drawer')).toHaveClass(/open/);
+  dismissNextDialog=false;await page.locator('#f-save').click();await expect(page.locator('#drawer')).not.toHaveClass(/open/);
+  await expect(page.locator('#col-email .card .over').first()).toContainText('Dev Alpha');
+  const devIds=await page.evaluate(async()=>Object.fromEntries((await (await fetch('/api/state')).json()).devices.map(d=>[d.name,d.id])));
+  const devAlphaId=devIds['Dev Alpha'];
+  await expect(page.locator(`.dev-filter option[value="${devAlphaId}"]`)).toHaveText('Dev Alpha（6/5） ⚠');
+  await page.locator('.dev-filter select').selectOption({value:devAlphaId});
+  await expect(page.locator('#col-email .card')).toHaveCount(6);
+  await page.locator('.dev-filter select').selectOption({value:devIds['Dev Beta']});
+  await expect(page.locator('#col-email .card')).toHaveCount(1);
+  await page.locator('.dev-filter select').selectOption({value:'__none'});
+  await expect(page.locator('#col-email')).toContainText('该筛选下暂无账号');
+  await page.locator('.dev-filter select').selectOption({value:''});
+  await expect(page.locator('#col-email .card')).toHaveCount(6);
+  await page.locator('.dev-filter select').selectOption({value:devAlphaId});
+  await page.locator('#col-email [data-edit]').first().click();await page.locator('#f-save').click();
+  expect(await page.locator('.dev-filter select').inputValue()).toBe(devAlphaId);
+  await page.locator('.dev-filter select').selectOption({value:''});
+  await page.locator('#settings').click();await page.locator(`[data-del-dev="${devAlphaId}"]`).click();
+  await expect(page.locator('#toast')).toContainText('有账号在用此设备，不能删');
+  await page.locator('#sdrawerClose').click();
+  await page.locator('#col-email .card .peek-btn').first().click();
+  await expect(page.locator('#peek')).toBeVisible();
+  await expect(page.locator('#peek .peek-note')).toContainText('</textarea><script>alert(1)</script>');
+  await expect(page.locator('#peek')).toContainText('创建时间：');
+  await expect(page.locator('#peek')).toContainText('更新时间：');
+  expect(await page.locator('#peek').textContent()).not.toMatch(/fake-account-secret|fake-totp-seed/);
+  await page.locator('#col-email .card .peek-btn').nth(1).click();
+  await expect(page.locator('#peek')).toBeVisible();
+  await expect(page.locator('#peek .peek-name')).toHaveText('extra1@example.test');
+  await page.locator('#lockNow').click();
+  await expect(page.locator('#peek')).toBeHidden();
+  await expect(page.locator('#peek')).toBeEmpty();
+  await unlock(page,nextMaster);
   const downloadPromise=page.waitForEvent('download');await page.locator('#export').click();const download=await downloadPromise;
   expect(download.suggestedFilename()).toBe('account-graph-backup.json');
-  await page.setViewportSize({width:390,height:844});await page.locator('[data-tab="ai"]').click();await expect(page.locator('#col-ai .card')).toHaveCount(1);
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-tab="email"]').click();
+  await expect(page.locator('#col-email .dev-filter')).toBeVisible();
+  await page.locator('[data-tab="ai"]').click();await expect(page.locator('#col-ai .card')).toHaveCount(1);
   await page.screenshot({path:'docs/agents/account-relation-mobile-verification.png'});
   const stale=await context.newPage();await stale.goto('/');await unlock(stale,nextMaster);
   await stale.locator('#add').click();await stale.locator('#f-platform').selectOption({label:'Gmail'});

@@ -17,7 +17,7 @@ export function openStore(filename) {
   db.pragma('busy_timeout = 5000');
   db.pragma('synchronous = FULL');
   const version = db.pragma('user_version', { simple: true });
-  if (version > 1) throw new Error('Database schema is newer than this server');
+  if (version > 2) throw new Error('Database schema is newer than this server');
   if (version === 0) db.transaction(() => {
     db.exec(`
       CREATE TABLE platforms (id TEXT PRIMARY KEY, category TEXT NOT NULL CHECK(category IN ('email','apple','ai')),
@@ -48,14 +48,33 @@ export function openStore(filename) {
     [['美区','#5b8fb0'],['中国大陆','#c2554d'],['尼日利亚','#6fae6a'],['土耳其','#d4a857']]
       .forEach(([name,color],i) => insertCountry.run(randomUUID(),name,color,i+1,now()));
   })();
+  if (version < 2) db.transaction(() => {
+    db.exec(`
+      CREATE TABLE devices (id TEXT PRIMARY KEY, name TEXT NOT NULL,
+        sort INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+      CREATE TABLE account_devices (
+        account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        device_id  TEXT NOT NULL REFERENCES devices(id)  ON DELETE RESTRICT,
+        PRIMARY KEY (account_id, device_id));
+      CREATE INDEX account_devices_device ON account_devices(device_id);
+      PRAGMA user_version=2;
+    `);
+  })();
 
   const revision = () => db.prepare('SELECT revision FROM data_version WHERE id=1').get().revision;
   const meta = () => db.prepare('SELECT salt,canary,created_at FROM vault_meta WHERE id=1').get() || null;
-  const snapshot = db.transaction(() => ({ revision: revision(), vault: meta(),
-    accounts: db.prepare('SELECT * FROM accounts ORDER BY created_at,id').all().map(a => ({ ...a, twofa_enabled: !!a.twofa_enabled })),
-    platforms: db.prepare('SELECT * FROM platforms ORDER BY sort,id').all(),
-    countries: db.prepare('SELECT * FROM countries ORDER BY sort,id').all(),
-  }));
+  const snapshot = db.transaction(() => {
+    const links = Map.groupBy(db.prepare('SELECT account_id,device_id FROM account_devices ORDER BY device_id').all(), r => r.account_id);
+    return {
+      revision: revision(), vault: meta(),
+      accounts: db.prepare('SELECT * FROM accounts ORDER BY created_at,id').all().map(a => ({
+        ...a, twofa_enabled: !!a.twofa_enabled, device_ids: (links.get(a.id) || []).map(r => r.device_id),
+      })),
+      platforms: db.prepare('SELECT * FROM platforms ORDER BY sort,id').all(),
+      countries: db.prepare('SELECT * FROM countries ORDER BY sort,id').all(),
+      devices: db.prepare('SELECT * FROM devices ORDER BY sort,id').all(),
+    };
+  });
   function mutate(expected, fn, initializing = false) {
     return db.transaction(() => {
       const vault = meta();
@@ -89,7 +108,8 @@ export function openStore(filename) {
   function saveAccount(data, id) {
     const previous = id ? db.prepare('SELECT * FROM accounts WHERE id=?').get(id) : null;
     if (id && !previous) throw new HttpError(404, '账号不存在');
-    const row = { ...previous, ...data };
+    const { device_ids, ...accountData } = data;
+    const row = { ...previous, ...accountData };
     validateRelations(row, id);
     const values = accountColumns.map(k => k === 'twofa_enabled' ? Number(!!row[k]) : row[k] ?? null);
     const timestamp = now();
@@ -98,22 +118,38 @@ export function openStore(filename) {
       id = randomUUID();
       db.prepare(`INSERT INTO accounts (id,${accountColumns.join(',')},created_at,updated_at) VALUES (${Array(values.length+3).fill('?').join(',')})`).run(id,...values,timestamp,timestamp);
     }
+    if (row.category !== 'email') {
+      db.prepare('DELETE FROM account_devices WHERE account_id=?').run(id);
+      if (device_ids?.length > 0) throw new HttpError(400, '只有 Email 账号可以记录登录设备');
+    } else if (device_ids !== undefined) {
+      const unique = [...new Set(device_ids)];
+      const checkDevice = db.prepare('SELECT 1 FROM devices WHERE id=?');
+      for (const did of unique) {
+        if (!checkDevice.get(did)) throw new HttpError(400, '设备不存在');
+      }
+      db.prepare('DELETE FROM account_devices WHERE account_id=?').run(id);
+      const insert = db.prepare('INSERT INTO account_devices (account_id, device_id) VALUES (?, ?)');
+      for (const did of unique) insert.run(id, did);
+    }
     return { id };
   }
   function deleteAccount(id) {
     if (!db.prepare('DELETE FROM accounts WHERE id=?').run(id).changes) throw new HttpError(404, '账号不存在');
   }
   function saveLookup(table, data) {
-    if (!['platforms','countries'].includes(table)) throw new Error('Invalid lookup table');
+    if (!['platforms','countries','devices'].includes(table)) throw new Error('Invalid lookup table');
     const id = randomUUID();
     if (table === 'platforms') db.prepare('INSERT INTO platforms VALUES (?,?,?,?,?,?)').run(id,data.category,data.name,data.color ?? null,data.sort ?? 0,now());
-    else db.prepare('INSERT INTO countries VALUES (?,?,?,?,?)').run(id,data.name,data.color,data.sort ?? 0,now());
+    else if (table === 'countries') db.prepare('INSERT INTO countries VALUES (?,?,?,?,?)').run(id,data.name,data.color,data.sort ?? 0,now());
+    else db.prepare('INSERT INTO devices VALUES (?,?,?,?)').run(id,data.name,data.sort ?? 0,now());
     return { id };
   }
   function deleteLookup(table, id) {
-    const column = { platforms: 'platform_id', countries: 'country_id' }[table];
-    if (!column) throw new Error('Invalid lookup table');
-    if (db.prepare(`SELECT id FROM accounts WHERE ${column}=? LIMIT 1`).get(id)) throw new HttpError(409, '仍有账号使用此项');
+    const refs = { platforms: ['accounts','platform_id'], countries: ['accounts','country_id'], devices: ['account_devices','device_id'] };
+    const ref = refs[table];
+    if (!ref) throw new Error('Invalid lookup table');
+    const [refTable, refCol] = ref;
+    if (db.prepare(`SELECT 1 FROM ${refTable} WHERE ${refCol}=? LIMIT 1`).get(id)) throw new HttpError(409, '仍有账号使用此项');
     if (!db.prepare(`DELETE FROM ${table} WHERE id=?`).run(id).changes) throw new HttpError(404, '条目不存在');
   }
   function initVault(data) {
