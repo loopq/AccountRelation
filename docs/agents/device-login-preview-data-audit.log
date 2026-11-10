@@ -1,0 +1,55 @@
+# 2026-11-10 #10 设备记录 + 👁 预览：生产库只读核对（只输出行数与内容指纹，不输出数据）
+# 脚本：better-sqlite3 readonly 打开；admins/sessions 随登录变化，只计数
+
+## 发布前（release 53f4acdd93dd9e9a742e，/data/account.db）
+USER_VERSION 1
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=2
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=651fb03a35bb9c7e
+platforms count=6 fp=82ee6ddfae35d52f
+countries count=6 fp=092e8450ceed800e
+accounts count=24 fp=9e88ce2338efd6fb
+devices absent
+account_devices absent
+
+## 预发布备份 /opt/backups/account-relation/predeploy-20261110T064249Z.db（临时容器拷贝后只读打开，未迁移）
+USER_VERSION 1
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=2
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=651fb03a35bb9c7e
+platforms count=6 fp=82ee6ddfae35d52f
+countries count=6 fp=092e8450ceed800e
+accounts count=24 fp=9e88ce2338efd6fb
+devices absent
+account_devices absent
+BACKUP_MATCHES_PREDEPLOY_BASELINE true
+
+## 发布后（release bae6614337d5430f9505，/data/account.db）
+USER_VERSION 2
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=2
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=651fb03a35bb9c7e
+platforms count=6 fp=82ee6ddfae35d52f
+countries count=6 fp=092e8450ceed800e
+accounts count=24 fp=9e88ce2338efd6fb
+devices count=0 fp=4f53cda18c2baa0c
+account_devices count=0 fp=4f53cda18c2baa0c
+
+## 结论
+SCHEMA_MIGRATED 1 -> 2
+VAULT_UNCHANGED true
+REVISION_UNCHANGED true
+ACCOUNTS_UNCHANGED true (24)
+PLATFORMS_UNCHANGED true (6)
+COUNTRIES_UNCHANGED true (6)
+NEW_TABLES devices=0 account_devices=0
+INTEGRITY ok; FK_VIOLATIONS 0

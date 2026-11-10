@@ -1,0 +1,13 @@
+# 2026-11-10 #10 发布后公网核对
+RELEASE_MARKER bae6614337d5430f9505 (server /etc/account-relation/current-release == docs/agents/current-release.txt)
+GIT_BASE d3dcbcc5396661122d314596f644ea1bdc378e85 (RELEASE_MANIFEST_VERIFIED)
+CONTAINER account-relation:bae6614337d5430f9505 healthy
+PUBLIC_HTTPS_APP_JS_MATCH false e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+# ↑ 本次单次请求 curl (35) LibreSSL SSL_connect: SSL_ERROR_SYSCALL，响应体为空（e3b0… 是空串哈希）；同一会话稍早一次请求已匹配
+PUBLIC_HTTPS_APP_JS_RETRY_MATCH 10/10 2be55418df398e5cd1bd6b78af97368df920fd5d5064cddbd8c7d03d1402d4fa
+SERVER_LOOPBACK_APP_JS_MATCH true 2be55418df398e5cd1bd6b78af97368df920fd5d5064cddbd8c7d03d1402d4fa
+# 判定：本机经代理/TUN 链路的偶发 TLS 失败，与发布无关；站点返回的 app.js 与本地 web/app.js 一致
+PUBLIC_HTTPS_INDEX_HTML_MATCH true 478a40e4e59c585cb9bf329c6c098405e84520f673755da96b20bfd1db33099c
+HEALTH_200
+ANON_API_STATE_401
+NO_LOGIN_NO_VAULT_WRITE true
