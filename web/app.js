@@ -60,6 +60,7 @@ function clearSensitive() {
   document.getElementById('sdrawerBody').replaceChildren();
   document.getElementById('mpw').value = '';
   document.getElementById('loginPw').value = '';
+  qInput.value = ''; query = '';
   connState.textContent = '';
   clearTimeout(window._clipT);
   if (copiedByApp) navigator.clipboard?.writeText('').catch(()=>{});
@@ -83,8 +84,10 @@ async function updateLockUI() {
   } catch (e) { document.getElementById('lockErr').textContent = e.message; }
 }
 
-const CAT_LABEL = { email: '📧 Email', apple: '🍎 Apple', ai: '🤖 AI 工具' };
+const CAT_LABEL = { email: 'Email', apple: 'Apple', ai: 'AI 工具' };
 const CAT_COLOR = { email: 'var(--cat-email)', apple: 'var(--cat-apple)', ai: 'var(--cat-ai)' };
+const CAT_ICON = { email: 'i-mail', apple: 'i-id', ai: 'i-spark' };
+const icon = (name) => `<svg class="ic" aria-hidden="true"><use href="#${name}"/></svg>`;
 
 // ============ 数据 ============
 let state = emptyState();
@@ -106,7 +109,7 @@ async function copyEphemeral(text, label, operationEpoch=epoch) {
     await navigator.clipboard.writeText(text);
     if (operationEpoch!==epoch) { await navigator.clipboard.writeText(''); return; }
     copiedByApp = true;
-    toast(label + " 已复制(30s 后清空)");
+    toast(`已复制${label} · 30 秒后清空剪贴板`);
     clearTimeout(window._clipT);
     window._clipT = setTimeout(() => navigator.clipboard.writeText("").catch(()=>{}), 30000);
   } catch { toast("复制失败,检查浏览器权限"); }
@@ -129,7 +132,7 @@ function esc(s){ return String(s ?? "").replace(/[&<>"]/g, ch => ({"&":"&amp;","
 function countryTag(country_id) {
   const c = countryById(country_id);
   if (!c) return '';
-  return `<span class="ctag" style="color:${esc(c.color)}">${esc(c.name)}</span>`;
+  return `<span class="chip" style="--cc:${esc(c.color)}">${esc(c.name)}</span>`;
 }
 
 // 登录用邮箱：email 类是自身 name；apple/ai 是其关联的注册邮箱
@@ -159,17 +162,31 @@ function devFilterBar() {
   return bar;
 }
 
+// 搜索：按名称 / 平台 / 手机 / 辅邮 / 备注过滤三列，与设备筛选叠加
+const qInput = document.getElementById('q');
+let query = '';
+qInput.oninput = () => { query = qInput.value.trim().toLowerCase(); render(); };
+qInput.onkeydown = (e) => { if (e.key === 'Escape' && qInput.value) { qInput.value = ''; qInput.oninput(); } };
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && masterKey && !/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) { e.preventDefault(); qInput.focus(); }
+});
+function matchQuery(a) {
+  if (!query) return true;
+  const plat = platformById(a.platform_id);
+  return [a.name, plat?.name, a.phone, a.recovery_email, a.note].some(v => v && v.toLowerCase().includes(query));
+}
+
 function render() {
   if (devFilter && devFilter !== '__none' && !deviceById(devFilter)) devFilter = '';
   for (const cat of ['email', 'apple', 'ai']) {
     const all = state.accounts.filter(a => a.category === cat);
-    const list = cat === 'email' ? all.filter(matchDevFilter) : all;
-    const cnt = list.length ? `· ${list.length}` : '';
+    const list = (cat === 'email' ? all.filter(matchDevFilter) : all).filter(matchQuery);
+    const cnt = list.length || '';
     document.getElementById('count-' + cat).textContent = cnt;
     document.getElementById('tab-count-' + cat).textContent = cnt;
     const box = document.getElementById('col-' + cat);
     if (!all.length) {
-      box.innerHTML = `<div class="col-empty">暂无${CAT_LABEL[cat].replace(/^.\s/, '')}账号<br>点上方「+ 账号」添加</div>`;
+      box.innerHTML = `<div class="col-empty">${icon(CAT_ICON[cat])}暂无 ${CAT_LABEL[cat]} 账号<br>点右上角「+ 账号」添加</div>`;
       continue;
     }
     box.innerHTML = '';
@@ -189,47 +206,49 @@ function render() {
 
 function renderCard(a) {
   const plat = platformById(a.platform_id);
-  const card = document.createElement('div');
+  const card = document.createElement('article');
   card.className = 'card';
-  card.style.borderLeftColor = CAT_COLOR[a.category];
 
-  let rel = '';
+  const showCountryPhone2fa = a.category === 'email' || a.category === 'apple';
+  const chips = [];
+  if (showCountryPhone2fa) {
+    chips.push(countryTag(a.country_id));
+    if (a.twofa_enabled) chips.push(`<span class="chip ok">${icon('i-check')}2FA</span>`);
+  }
+  // 键值行：[标签, HTML]
+  const rows = [];
+  if (showCountryPhone2fa && a.phone) rows.push(['手机', `<span class="mono">${esc(a.phone)}</span>`]);
+  if (a.category === 'email') {
+    // 按设置里的设备顺序显示（device_ids 本身按 id 排序）
+    const devNames = state.devices.filter(d => a.device_ids?.includes(d.id))
+      .map(d => `<span class="${deviceCount(d.id) > DEVICE_CAP ? 'over' : ''}">${esc(d.name)}</span>`).join(', ');
+    if (devNames) rows.push(['设备', devNames]);
+  }
+  if (a.recovery_email) rows.push(['辅邮', `<span class="mono">${esc(a.recovery_email)}</span>`]);
   if (a.register_email_id) {
     const e = accountById(a.register_email_id);
-    rel += `<span style="color:var(--cat-email)">→ 注册</span> <span class="link" data-goto="${a.register_email_id}">${e ? esc(e.name) : '?'}</span><br>`;
+    rows.push(['注册', `<span class="link mono" data-goto="${a.register_email_id}">${e ? esc(e.name) : '?'}</span>`]);
   }
   if (a.subscribe_apple_id) {
     const ap = accountById(a.subscribe_apple_id);
-    rel += `<span style="color:var(--cat-apple)">→ 订阅于</span> <span class="link" data-goto="${a.subscribe_apple_id}">${ap ? esc(ap.name) : '?'}</span><br>`;
+    rows.push(['订阅', `<span class="link mono" data-goto="${a.subscribe_apple_id}">${ap ? esc(ap.name) : '?'}</span>`]);
   }
 
-  const showCountryPhone2fa = a.category === 'email' || a.category === 'apple';
-  // 按设置里的设备顺序显示（device_ids 本身按 id 排序）
-  const devNames = a.category === 'email' ? state.devices.filter(d => a.device_ids?.includes(d.id))
-    .map(d => `<span class="${deviceCount(d.id) > DEVICE_CAP ? 'over' : ''}">${esc(d.name)}</span>`).join(', ') : '';
-
   card.innerHTML = `
-    <div class="ctop">
-      <div>
-        <div class="plat">${esc(plat ? plat.name : '—')}</div>
-        <div class="name">${esc(a.name)} <button type="button" class="peek-btn" aria-label="预览概况">👁</button></div>
-      </div>
-      <span class="edit" data-edit="${a.id}">编辑 ›</span>
+    <div class="c-head">
+      <span class="plat">${esc(plat ? plat.name : '—')}</span>
+      <button type="button" class="edit" data-edit="${a.id}">编辑${icon('i-chev')}</button>
     </div>
-    ${showCountryPhone2fa ? countryTag(a.country_id) : ''}
-    <div class="meta">
-      ${showCountryPhone2fa && a.phone ? `<b>手机</b> ${esc(a.phone)} ${a.twofa_enabled ? '<span class="twofa-on">· 2FA✓</span>' : ''}<br>`
-        : (showCountryPhone2fa && a.twofa_enabled ? '<span class="twofa-on">2FA✓</span><br>' : '')}
-      ${devNames ? `<b>设备</b> ${devNames}<br>` : ''}
-      ${a.recovery_email ? `<b>辅邮</b> ${esc(a.recovery_email)}<br>` : ''}
-      ${a.encrypted_password ? '<span class="haspw"><b>密码</b> 已加密 ✓</span><br>' : '<span style="opacity:.6">无密码</span><br>'}
-      ${a.encrypted_2fa ? '<span class="haspw"><b>2FA密钥</b> 已加密 ✓</span><br>' : ''}
-      ${rel}
+    <div class="c-name">
+      <span class="mono">${esc(a.name)}</span>
+      <button type="button" class="peek-btn" aria-label="预览概况" title="预览概况">${icon('i-eye')}</button>
     </div>
+    <div class="chips">${chips.join('')}</div>
+    <dl class="meta">${rows.map(([k, v]) => `<dt>${k}</dt> <dd>${v}</dd>`).join('')}</dl>
     <div class="quick">
       <button class="mini" data-cp-email="${a.id}">复制邮箱</button>
-      <button class="mini" data-cp-pass="${a.id}" ${a.encrypted_password ? '' : 'disabled'}>复制密码</button>
-      ${a.encrypted_2fa ? `<button class="mini" data-cp-2fa="${a.id}">复制2FA</button>` : ''}
+      <button class="mini" data-cp-pass="${a.id}" ${a.encrypted_password ? '' : 'disabled title="未设置密码"'}>复制密码</button>
+      ${a.encrypted_2fa ? `<button class="mini" data-cp-2fa="${a.id}">复制 2FA</button>` : ''}
     </div>`;
 
   card.querySelector('[data-edit]').onclick = () => openForm(a);
@@ -271,7 +290,7 @@ function fillPeek(a) {
       const relTypes = [];
       if (x.register_email_id === a.id) relTypes.push('注册');
       if (x.subscribe_apple_id === a.id) relTypes.push('订阅');
-      relHtml += `<div class="peek-rel-item"><span style="color:${CAT_COLOR[x.category]}">${esc(tag)}</span> ${esc(x.name)} · ${esc(relTypes.join('|'))}</div>`;
+      relHtml += `<div class="peek-rel-item"><span class="plat" style="--c:${CAT_COLOR[x.category]}">${esc(tag)}</span><span class="mono">${esc(x.name)}</span><span class="how">${esc(relTypes.join(' · '))}</span></div>`;
     }
     relHtml += `</div>`;
   }
@@ -280,7 +299,7 @@ function fillPeek(a) {
   const noteHtml = a.note ? `<div class="peek-note">${esc(a.note)}</div>` : `<div class="peek-note peek-empty">无备注</div>`;
   const peekEl = document.getElementById('peek');
   peekEl.innerHTML = `
-    <div class="peek-head">
+    <div class="peek-head" style="--c:${CAT_COLOR[a.category]}">
       <div class="peek-plat">${esc(platName)}</div>
       <div class="peek-name">${esc(a.name)}</div>
     </div>
@@ -299,14 +318,17 @@ function fillPeek(a) {
 const drawer = document.getElementById('drawer');
 function closeDrawer() { drawer.classList.remove('open'); document.getElementById('drawerBody').replaceChildren(); }
 document.getElementById('drawerClose').onclick = closeDrawer;
+// 遮罩点击 / Escape 关闭两个抽屉（popover 的 Escape 由浏览器原生处理）
+function closeAll() { closeDrawer(); sdrawer.classList.remove('open'); }
+document.getElementById('scrim').onclick = closeAll;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAll(); });
 
 function platformOptions(selectedId) {
-  const groups = { email: '📧 Email', apple: '🍎 Apple', ai: '🤖 AI 工具' };
   let html = '<option value="">— 选择平台 —</option>';
   for (const cat of ['email', 'apple', 'ai']) {
     const ps = state.platforms.filter(p => p.category === cat);
     if (!ps.length) continue;
-    html += `<optgroup label="${groups[cat]}">`;
+    html += `<optgroup label="${CAT_LABEL[cat]}">`;
     for (const p of ps) html += `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(p.name)}</option>`;
     html += '</optgroup>';
   }
@@ -336,63 +358,70 @@ function openForm(a) {
     const cnt = deviceCount(d.id);
     const checked = curDevIds.includes(d.id) ? 'checked' : '';
     return `<label><input type="checkbox" value="${esc(d.id)}" ${checked}> ${esc(d.name)} <span class="${cnt > DEVICE_CAP ? 'over' : ''}">${cnt}/${DEVICE_CAP}</span></label>`;
-  }).join('') : '<div class="hint">先在 ⚙ 设置 → 设备管理 添加设备</div>';
+  }).join('') : '<div class="hint">先在「设置 → 设备」添加设备</div>';
 
   const body = document.getElementById('drawerBody');
   body.innerHTML = `
-    <label>平台 *</label>
-    <select id="f-platform">${platformOptions(a.platform_id)}</select>
-    <label>账号名 *</label>
-    <input id="f-name" value="${esc(a.name || '')}" placeholder="账号显示名">
+    <div class="group">
+      <div class="group-title">基本</div>
+      <label for="f-platform">平台 *</label>
+      <select id="f-platform">${platformOptions(a.platform_id)}</select>
+      <label for="f-name">账号名 *</label>
+      <input id="f-name" class="mono" value="${esc(a.name || '')}" placeholder="邮箱地址或显示名" spellcheck="false">
+    </div>
 
-    <div class="field-devices">
-      <label>登录设备（多选）</label>
+    <div class="group field-devices">
+      <div class="group-title">登录设备</div>
       <div class="dev-list">
         ${devOptionsHtml}
       </div>
     </div>
 
-    <div class="field-email-apple">
-      <label>绑定手机号</label>
-      <input id="f-phone" value="${esc(a.phone || '')}" placeholder="+86 138 0000 0000">
-      <label>国家 / 地区</label>
-      <select id="f-country">${countryOptions(a.country_id)}</select>
-      <label>辅助邮箱</label>
-      <input id="f-recovery" value="${esc(a.recovery_email || '')}" placeholder="recovery@example.com">
-      <div class="toggle-row">
-        <input type="checkbox" id="f-2fa" ${a.twofa_enabled ? 'checked' : ''}>
-        <label for="f-2fa">已开启 2FA 两步验证</label>
-      </div>
-      <label>2FA 密钥 / TOTP 种子（本地加密后存云）</label>
+    <div class="group">
+      <div class="group-title">安全</div>
+      <label for="f-pw">密码</label>
       <div class="pw-row">
-        <input id="f-2fakey" type="password" placeholder="${a.encrypted_2fa ? '已加密 · 留空=清除' : '密钥串'}">
-        <button class="mini ghost" id="f-2fakey-show" type="button">显示</button>
+        <input id="f-pw" type="password" placeholder="${a.encrypted_password ? '已加密 · 留空 = 清除' : '输入密码'}">
+        <button class="mini ghost" id="f-pw-show" type="button">显示</button>
+      </div>
+      <div class="hint">保存时用主密码在浏览器加密，服务器只存密文。</div>
+      <div class="field-email-apple">
+        <label for="f-phone">绑定手机号</label>
+        <input id="f-phone" class="mono" value="${esc(a.phone || '')}" placeholder="+86 138 0000 0000">
+        <label for="f-country">国家 / 地区</label>
+        <select id="f-country">${countryOptions(a.country_id)}</select>
+        <label for="f-recovery">辅助邮箱</label>
+        <input id="f-recovery" class="mono" value="${esc(a.recovery_email || '')}" placeholder="recovery@example.com" spellcheck="false">
+        <div class="toggle-row">
+          <input type="checkbox" id="f-2fa" ${a.twofa_enabled ? 'checked' : ''}>
+          <label for="f-2fa">已开启 2FA 两步验证</label>
+        </div>
+        <label for="f-2fakey">2FA 密钥 / TOTP 种子</label>
+        <div class="pw-row">
+          <input id="f-2fakey" type="password" placeholder="${a.encrypted_2fa ? '已加密 · 留空 = 清除' : '密钥串'}">
+          <button class="mini ghost" id="f-2fakey-show" type="button">显示</button>
+        </div>
       </div>
     </div>
 
-    <div class="field-register">
-      <label>注册邮箱（关联 Email 账号）</label>
+    <div class="group field-register">
+      <div class="group-title">关联</div>
+      <label for="f-register">注册邮箱</label>
       <select id="f-register">${accountOptions('email', a.register_email_id)}</select>
+      <div class="field-subscribe">
+        <label for="f-subscribe">订阅所用的 Apple ID</label>
+        <select id="f-subscribe">${accountOptions('apple', a.subscribe_apple_id)}</select>
+      </div>
     </div>
 
-    <div class="field-subscribe">
-      <label>订阅 Apple ID（通过哪个 Apple ID 订阅）</label>
-      <select id="f-subscribe">${accountOptions('apple', a.subscribe_apple_id)}</select>
+    <div class="group">
+      <div class="group-title">备注</div>
+      <textarea id="f-note" placeholder="恢复邮箱、支付信息、杂项都写这">${esc(a.note || '')}</textarea>
     </div>
-
-    <label>密码（本地加密后存云）</label>
-    <div class="pw-row">
-      <input id="f-pw" type="password" placeholder="${a.encrypted_password ? '已加密 · 留空=清除' : '输入密码'}">
-      <button class="mini ghost" id="f-pw-show" type="button">显示</button>
-    </div>
-    <div class="hint">明文密码,保存时用主密码加密,云端只存密文。</div>
-
-    <label>备注（恢复邮箱 / 支付信息 / 杂项都写这）</label>
-    <textarea id="f-note">${esc(a.note || '')}</textarea>
 
     <div class="btn-row">
       <button class="primary" id="f-save">保存</button>
-      ${isNew ? '' : '<button class="ghost" id="f-del" style="color:var(--danger)">删除</button>'}
+      ${isNew ? '' : '<button class="ghost danger" id="f-del">删除</button>'}
     </div>`;
 
   const platSel = body.querySelector('#f-platform');
@@ -534,63 +563,74 @@ function renderSettings() {
   const pref = localStorage.getItem(THEME_KEY) || 'system';
   const catLabel = { email: 'Email', apple: 'Apple', ai: 'AI' };
   let html = `
-    <div class="mobile-only">
-      <label>快捷操作</label>
+    <div class="mobile-only quick-actions">
       <div class="seg">
-        <button id="mLock" class="ghost">🔒 锁定</button>
-        <button id="mExport" class="ghost">⬇ 导出</button>
-        <button id="mLogout" class="ghost">退出登录</button>
+        <button id="mLock" class="ghost">${icon('i-lock')}锁定</button>
+        <button id="mExport" class="ghost">${icon('i-download')}导出</button>
+        <button id="mLogout" class="ghost">${icon('i-logout')}退出</button>
       </div>
     </div>
-    <label>外观主题</label>
-    <div class="seg">
-      <button data-theme-set="light" class="${pref==='light'?'active':''}">亮色</button>
-      <button data-theme-set="dark" class="${pref==='dark'?'active':''}">暗色</button>
-      <button data-theme-set="system" class="${pref==='system'?'active':''}">跟随系统</button>
+    <div class="group">
+      <div class="group-title">外观</div>
+      <div class="seg">
+        <button data-theme-set="light" class="${pref==='light'?'active':''}">亮色</button>
+        <button data-theme-set="dark" class="${pref==='dark'?'active':''}">暗色</button>
+        <button data-theme-set="system" class="${pref==='system'?'active':''}">跟随系统</button>
+      </div>
     </div>
-    <label>平台管理</label>`;
+    <div class="group">
+      <div class="group-title">平台</div>`;
   for (const p of state.platforms)
     html += `<div class="mrow"><span class="mname">${esc(p.name)}</span>
       <span class="mcat">${catLabel[p.category] || p.category}</span>
-      <button class="mini ghost" data-del-plat="${p.id}">删</button></div>`;
+      <button class="mini ghost" data-del-plat="${p.id}" aria-label="删除平台">删除</button></div>`;
   html += `<div class="add-row">
-      <select id="newPlatCat" style="flex:none;width:84px">
+      <select id="newPlatCat" style="flex:none;width:96px">
         <option value="email">Email</option><option value="apple">Apple</option><option value="ai">AI</option>
       </select>
       <input id="newPlatName" placeholder="平台名" style="flex:1">
-      <button class="mini" id="addPlat" style="flex:none">+ 加</button>
+      <button class="mini" id="addPlat" style="flex:none">添加</button>
     </div>
-    <label>国家 / 地区管理</label>`;
+    </div>
+    <div class="group">
+      <div class="group-title">国家 / 地区</div>`;
   for (const c of state.countries)
     html += `<div class="mrow"><span class="swatch2" style="background:${esc(c.color)}"></span>
       <span class="mname">${esc(c.name)}</span>
-      <button class="mini ghost" data-del-ctry="${c.id}">删</button></div>`;
+      <button class="mini ghost" data-del-ctry="${c.id}" aria-label="删除国家/地区">删除</button></div>`;
   html += `<div class="add-row">
-      <input type="color" id="newCtryColor" value="#5b8fb0">
-      <input id="newCtryName" placeholder="国家/地区名" style="flex:1">
-      <button class="mini" id="addCtry" style="flex:none">+ 加</button>
+      <input type="color" id="newCtryColor" value="#5b8fb0" aria-label="颜色">
+      <input id="newCtryName" placeholder="国家 / 地区名" style="flex:1">
+      <button class="mini" id="addCtry" style="flex:none">添加</button>
     </div>
-    <label>设备管理</label>`;
+    </div>
+    <div class="group">
+      <div class="group-title">设备 <span class="group-sub">每台软上限 ${DEVICE_CAP} 个 Email</span></div>`;
   for (const d of state.devices) {
     const cnt = deviceCount(d.id);
     html += `<div class="mrow"><span class="mname">${esc(d.name)} · <span class="${cnt > DEVICE_CAP ? 'over' : ''}">${cnt}/${DEVICE_CAP}</span></span>
-      <button class="mini ghost" data-del-dev="${d.id}">删</button></div>`;
+      <button class="mini ghost" data-del-dev="${d.id}" aria-label="删除设备">删除</button></div>`;
   }
   html += `<div class="add-row">
       <input id="newDevName" placeholder="设备名" style="flex:1">
-      <button class="mini" id="addDev" style="flex:none">+ 加</button>
+      <button class="mini" id="addDev" style="flex:none">添加</button>
     </div>
-    <label>更改主密码</label>
-    <input type="password" id="curMpw" placeholder="当前主密码（验证身份）">
-    <input type="password" id="newMpw1" placeholder="新主密码" style="margin-top:6px">
-    <input type="password" id="newMpw2" placeholder="再次输入新主密码" style="margin-top:6px">
-    <div class="btn-row"><button id="changeMpw">更改并重新加密全部</button></div>
-    <div class="hint">会用新密码重新加密所有条目（事务原子，失败不损坏）。建议先「导出」备份。</div>
-    <label>批量导入（粘贴 JSON）</label>
-    <textarea id="importJson" placeholder='[{"platform":"Gmail","name":"x@gmail.com","password":"...","recovery_email":"...","twofa_secret":"...","phone":"...","twofa_enabled":true}]' style="min-height:90px"></textarea>
-    <div class="btn-row"><button id="importBtn">解析并导入</button></div>
-    <div class="hint" id="importMsg">password 和 2FA 密钥在本地加密后入库。platform 必须是已有平台名。</div>
-    <div class="hint">密码与 2FA 密钥已加密；账号名称、联系方式和备注作为元数据保存。</div>`;
+    </div>
+    <div class="group">
+      <div class="group-title">更改主密码</div>
+      <input type="password" id="curMpw" placeholder="当前主密码（验证身份）" autocomplete="off">
+      <input type="password" id="newMpw1" placeholder="新主密码" style="margin-top:6px" autocomplete="new-password">
+      <input type="password" id="newMpw2" placeholder="再次输入新主密码" style="margin-top:6px" autocomplete="new-password">
+      <div class="btn-row"><button id="changeMpw">更改并重新加密全部</button></div>
+      <div class="hint">会用新密码重新加密所有条目（事务原子，失败不损坏）。建议先导出备份。</div>
+    </div>
+    <div class="group">
+      <div class="group-title">批量导入</div>
+      <textarea id="importJson" class="mono" placeholder='[{"platform":"Gmail","name":"x@gmail.com","password":"...","recovery_email":"...","twofa_secret":"...","phone":"...","twofa_enabled":true}]' style="min-height:96px" spellcheck="false"></textarea>
+      <div class="btn-row"><button id="importBtn">解析并导入</button></div>
+      <div class="hint" id="importMsg">password 和 2FA 密钥在本地加密后入库。platform 必须是已有平台名。</div>
+      <div class="hint">密码与 2FA 密钥已加密；账号名称、联系方式和备注作为元数据保存。</div>
+    </div>`;
 
   const body = document.getElementById('sdrawerBody');
   body.innerHTML = html;

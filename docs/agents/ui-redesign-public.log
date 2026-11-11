@@ -1,0 +1,10 @@
+# 2026-11-11 Web UI 重做发布后公网核对（release c9c611f1ff5831bd6a01）
+LOCAL_INDEX_SHA256 8274e61b5b8600626a39e553ad7a6a669364ee55b6403c6c203fd1001693d5b8
+LOCAL_APP_JS_SHA256 ff6950a60c8ef31f0be3c9c23da059a46899d7d0a0a112e2d5b1a272be32cdaf
+PUBLIC_HTTPS_index.html_MATCH 10/10
+PUBLIC_HTTPS_app.js_MATCH 10/10
+HEALTH 200
+ANON_API_STATE 401
+ROOT_200 200 0.618192s
+CSP content-security-policy: default-src 'none'; script-src 'self'; style-src 'self'...
+NO_LOGIN_NO_VAULT_WRITE true

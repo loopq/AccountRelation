@@ -1,0 +1,18 @@
+# 2026-11-11 Web UI 重做发布后服务器核对（只输出计数与哈希，不输出数据）
+RELEASE_MARKER c9c611f1ff5831bd6a01
+PREVIOUS_ENV APP_IMAGE=account-relation:bae6614337d5430f9505
+CONTAINER account-relation:c9c611f1ff5831bd6a01 Up 4 minutes (healthy)
+LATEST_PREDEPLOY_BACKUP predeploy-20261111T021039Z.db
+SERVER_LOOPBACK_index.html_SHA256 200 8274e61b5b8600626a39e553ad7a6a669364ee55b6403c6c203fd1001693d5b8
+SERVER_LOOPBACK_app.js_SHA256 200 ff6950a60c8ef31f0be3c9c23da059a46899d7d0a0a112e2d5b1a272be32cdaf
+USER_VERSION 2
+INTEGRITY ok
+FK_VIOLATIONS 0
+accounts count=25
+platforms count=6
+countries count=7
+devices count=6
+account_devices count=14
+vault_meta count=1
+admins count=1
+REVISION 74

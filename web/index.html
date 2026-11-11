@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>账号图谱 v4 · 分类树</title>
+<title>账号图谱</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#f4f4f0" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)">
@@ -13,250 +13,411 @@
 <meta name="apple-mobile-web-app-title" content="账号图谱">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
 <style>
+  /* ---------- tokens ---------- */
   :root {
-    --bg: #0e0f13; --panel: #16181f; --panel-2: #1d2029; --line: #2a2e3a;
-    --ink: #e8e6e0; --ink-dim: #8b8f9c; --accent: #d4a857; --accent-2: #5b8fb0;
-    --danger: #c2554d; --ok: #6fae6a;
+    --bg: #0e0f13; --panel: #171a21; --panel-2: #1f232c; --field: #0f1116;
+    --line: #272b36; --line-strong: #3a3f4d;
+    --ink: #e9e7e1; --ink-2: #b6b9c3; --ink-dim: #7f8493;
+    --accent: #d4a857; --accent-ink: #1a1507; --accent-soft: rgba(212,168,87,.14);
+    --accent-2: #6a9cbd;
+    --danger: #d4675f; --danger-soft: rgba(212,103,95,.14);
+    --ok: #72b26c; --ok-soft: rgba(114,178,108,.14);
     --cat-email: #5b8fb0; --cat-apple: #d4a857; --cat-ai: #9b7fc4;
+    --shadow-1: 0 1px 2px rgba(0,0,0,.35);
+    --shadow-2: 0 12px 32px -12px rgba(0,0,0,.6);
+    --r-s: 7px; --r-m: 11px; --r-l: 16px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    color-scheme: dark;
   }
   [data-theme="light"] {
-    --bg: #f4f4f0; --panel: #ffffff; --panel-2: #eeeee8; --line: #d6d6cc;
-    --ink: #1b1d22; --ink-dim: #6b7280; --accent: #b07d2e; --accent-2: #3d7196;
-    --danger: #b0433b; --ok: #4a8a45;
+    --bg: #f4f4f0; --panel: #ffffff; --panel-2: #eeeee8; --field: #fcfcfa;
+    --line: #e1e1d9; --line-strong: #c9c9bf;
+    --ink: #1b1d22; --ink-2: #4a4f5b; --ink-dim: #7a7f8c;
+    --accent: #b07d2e; --accent-ink: #1a1507; --accent-soft: rgba(176,125,46,.13);
+    --accent-2: #3d7196;
+    --danger: #b0433b; --danger-soft: rgba(176,67,59,.1);
+    --ok: #4a8a45; --ok-soft: rgba(74,138,69,.12);
     --cat-email: #3d7196; --cat-apple: #b07d2e; --cat-ai: #7a5fa4;
+    --shadow-1: 0 1px 2px rgba(30,30,20,.07);
+    --shadow-2: 0 12px 32px -12px rgba(30,30,20,.22);
+    color-scheme: light;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* ---------- base ---------- */
+  * { box-sizing: border-box; margin: 0; padding: 0; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
   html, body { height: 100%; }
   body {
-    background: var(--bg); color: var(--ink);
-    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
-    display: flex; flex-direction: column; overflow: hidden; -webkit-text-size-adjust: 100%;
+    background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.5;
+    display: flex; flex-direction: column; overflow: hidden;
+    -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased;
   }
-  header {
-    padding: max(13px, env(safe-area-inset-top)) 20px 13px; border-bottom: 1px solid var(--line);
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  }
-  header h1 { font-size: 15px; font-weight: 600; }
-  header h1 .dot { color: var(--accent); }
-  header .sub { font-size: 11px; color: var(--ink-dim); }
-  header .spacer { flex: 1; }
-  #connState { font-size: 10px; color: var(--ink-dim); }
-  #connState b { color: var(--ok); }
-  #connState b.off { color: var(--danger); }
+  .sprite { display: none; }
+  .mono { font-family: var(--mono); font-size: .94em; }
+  .ic { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .mark { display: block; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ::selection { background: var(--accent-soft); }
+  .hidden { display: none !important; }
+  .over { color: var(--danger); font-weight: 600; }
+  /* ---------- buttons ---------- */
   button {
-    font-family: inherit; font-size: 11px; background: var(--panel-2); color: var(--ink);
-    border: 1px solid var(--line); padding: 6px 11px; border-radius: 5px;
-    cursor: pointer; transition: border-color .15s, background .15s;
+    font: inherit; font-size: 13px; font-weight: 500; line-height: 1.2; color: var(--ink);
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-s); padding: 7px 12px;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+    transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .1s;
   }
-  button:hover { border-color: var(--accent); }
-  button:disabled { opacity: .4; cursor: not-allowed; }
-  button.primary { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 600; }
+  button:hover { border-color: var(--line-strong); background: color-mix(in srgb, var(--panel-2), var(--ink) 6%); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; box-shadow: var(--shadow-1); }
+  button.primary:hover { background: color-mix(in srgb, var(--accent), #fff 9%); border-color: transparent; }
   button.ghost { background: transparent; }
-  button.mini { font-size: 10px; padding: 3px 8px; }
-  /* 三等分主区 */
+  button.ghost:hover { background: var(--panel-2); }
+  button.mini { font-size: 12px; padding: 4px 9px; }
+  button.icon { width: 34px; height: 34px; padding: 0; color: var(--ink-2); background: transparent; border-color: transparent; }
+  button.icon:hover { color: var(--ink); background: var(--panel-2); border-color: transparent; }
+  button.icon .ic { width: 17px; height: 17px; }
+  button.danger { color: var(--danger); }
+  button.danger:hover { background: var(--danger-soft); border-color: var(--danger); }
+  /* ---------- header ---------- */
+  header.top {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+    padding: max(10px, env(safe-area-inset-top)) 18px 10px; border-bottom: 1px solid var(--line); background: var(--bg);
+  }
+  .brand { display: flex; align-items: center; gap: 9px; }
+  .brand .mark { width: 26px; height: 26px; }
+  .brand h1 { font-size: 15px; font-weight: 650; letter-spacing: .01em; }
+  .search {
+    flex: 1; min-width: 180px; max-width: 400px; height: 34px; display: flex; align-items: center; gap: 8px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-m); padding: 0 10px; color: var(--ink-dim);
+    transition: border-color .15s, box-shadow .15s, color .15s;
+  }
+  .search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--ink); }
+  .search .ic { width: 15px; height: 15px; }
+  .search input { flex: 1; min-width: 0; height: 100%; background: none; border: 0; padding: 0; font-size: 13px; color: var(--ink); box-shadow: none; }
+  .search input:focus { outline: none; box-shadow: none; }
+  .search kbd { font: 11px var(--mono); border: 1px solid var(--line-strong); border-radius: 4px; padding: 0 5px; color: var(--ink-dim); }
+  .search:focus-within kbd, .search:has(input:not(:placeholder-shown)) kbd { display: none; }
+  .spacer { flex: 1; }
+  #connState { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-dim); white-space: nowrap; }
+  #connState::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+  #connState:empty { display: none; }
+  .actions { display: flex; align-items: center; gap: 4px; }
+  .actions .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+  /* ---------- columns ---------- */
   main { flex: 1; display: flex; min-height: 0; gap: 1px; background: var(--line); }
-  .column { flex: 1; background: var(--bg); display: flex; flex-direction: column; min-width: 0; }
+  .column { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--bg); }
+  [data-cat="email"], [data-tab="email"] { --c: var(--cat-email); }
+  [data-cat="apple"], [data-tab="apple"] { --c: var(--cat-apple); }
+  [data-cat="ai"], [data-tab="ai"] { --c: var(--cat-ai); }
   .col-head {
-    padding: 11px 16px; border-bottom: 1px solid var(--line);
-    font-size: 12px; font-weight: 600; letter-spacing: 0.04em;
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px 10px;
+    font-size: 13px; font-weight: 600; color: var(--ink-2); border-bottom: 1px solid var(--line);
   }
-  .col-head .count { font-size: 10px; color: var(--ink-dim); font-weight: 400; }
-  .col-head .bar { width: 3px; height: 14px; border-radius: 2px; }
-  .col-body { overflow-y: auto; flex: 1; padding: 10px; }
-  .col-empty { padding: 30px 14px; text-align: center; color: var(--ink-dim); font-size: 11px; line-height: 1.7; }
+  .col-head .ic { width: 16px; height: 16px; color: var(--c); }
+  .count {
+    margin-left: auto; min-width: 22px; text-align: center; font: 600 11px/18px var(--mono);
+    color: var(--ink-dim); background: var(--panel-2); border-radius: 999px; padding: 0 7px;
+  }
+  .count:empty { display: none; }
+  .col-body { flex: 1; overflow-y: auto; padding: 12px; }
+  .col-empty { padding: 44px 16px; text-align: center; color: var(--ink-dim); font-size: 13px; line-height: 1.8; }
+  .col-empty .ic { display: block; width: 28px; height: 28px; margin: 0 auto 8px; opacity: .45; }
+  /* ---------- card ---------- */
   .card {
-    background: var(--panel-2); border: 1px solid var(--line); border-left-width: 3px;
-    border-radius: 6px; padding: 10px 12px; margin-bottom: 9px;
+    position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-m);
+    padding: 12px 14px 12px 17px; margin-bottom: 10px; box-shadow: var(--shadow-1);
+    transition: border-color .15s, box-shadow .15s, transform .15s;
   }
-  .card:hover { border-color: var(--accent-2); }
-  .card .ctop { display: flex; justify-content: space-between; align-items: flex-start; }
-  .card .plat { font-size: 10px; color: var(--ink-dim); letter-spacing: 0.05em; text-transform: uppercase; }
-  .card .name { font-size: 13px; font-weight: 600; margin-top: 1px; }
-  .card .edit { font-size: 10px; color: var(--ink-dim); cursor: pointer; }
-  .card .edit:hover { color: var(--accent); }
-  .ctag {
-    display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 10px;
-    border: 1px solid currentColor; margin-top: 7px;
+  .card::before { content: ""; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 3px; border-radius: 0 3px 3px 0; background: var(--c); }
+  .card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-2); transform: translateY(-1px); }
+  .c-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .plat { font-size: 11px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--c); }
+  .card .edit { padding: 2px 4px 2px 7px; font-size: 12px; color: var(--ink-dim); background: none; border-color: transparent; gap: 1px; }
+  .card .edit:hover { color: var(--ink); background: var(--panel-2); }
+  .card .edit .ic { width: 13px; height: 13px; }
+  .c-name { display: flex; align-items: center; gap: 4px; margin-top: 3px; min-width: 0; font-size: 14px; font-weight: 600; }
+  .c-name .mono { min-width: 0; overflow-wrap: anywhere; }
+  .peek-btn { width: 24px; height: 24px; padding: 0; color: var(--ink-dim); background: none; border-color: transparent; }
+  .peek-btn:hover { color: var(--accent); background: var(--accent-soft); border-color: transparent; }
+  .peek-btn .ic { width: 15px; height: 15px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .chips:empty { display: none; }
+  .chip {
+    --cc: var(--ink-dim); display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; line-height: 1;
+    padding: 4px 8px; border-radius: 999px; color: var(--cc);
+    border: 1px solid color-mix(in srgb, var(--cc), transparent 55%); background: color-mix(in srgb, var(--cc), transparent 88%);
   }
-  .card .meta { font-size: 11px; color: var(--ink-dim); margin-top: 7px; line-height: 1.7; }
-  .card .meta b { color: var(--ink); font-weight: 500; }
+  .chip.ok { --cc: var(--ok); }
+  .chip .ic { width: 11px; height: 11px; stroke-width: 2.4; }
+  .meta { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; margin-top: 9px; font-size: 12.5px; line-height: 1.5; }
+  .meta:empty { display: none; }
+  .meta dt { color: var(--ink-dim); white-space: nowrap; }
+  .meta dd { color: var(--ink-2); overflow-wrap: anywhere; }
   .link { color: var(--accent-2); cursor: pointer; }
   .link:hover { text-decoration: underline; }
-  .twofa-on { color: var(--ok); }
-  .haspw { color: var(--ok); }
-  .over { color: var(--danger); }
-  .dev-filter { position: sticky; top: 0; margin: -10px -10px 10px -10px; padding: 10px 10px 4px 10px; background: var(--bg); z-index: 5; }
-  .dev-filter select { width: 100%; }
-  .dev-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-  .dev-list label { display: flex; align-items: center; gap: 8px; margin: 0; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--ink); cursor: pointer; }
-  .dev-list input { width: auto; }
-  .dev-list span { font-size: 10px; color: var(--ink-dim); margin-left: 2px; }
-  .dev-list span.over { color: var(--danger); font-weight: 600; }
-  .peek-btn { background: transparent; border: none; padding: 0 3px; cursor: pointer; font-size: 11px; vertical-align: middle; line-height: 1; color: var(--ink-dim); }
-  .peek-btn:hover { color: var(--accent); border: none; }
-  #peek { margin: auto; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; width: min(340px, calc(100% - 32px)); max-height: 70vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.3); }
-  #peek::backdrop { background: rgba(0, 0, 0, 0.4); pointer-events: none; }
-  .peek-head { margin-bottom: 10px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
-  .peek-plat { font-size: 10px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.05em; }
-  .peek-name { font-size: 14px; font-weight: 600; margin-top: 2px; }
-  .peek-sec { margin-top: 10px; }
-  .peek-lbl { font-size: 10px; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; }
-  .peek-note { font-size: 12px; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
-  .peek-empty { color: var(--ink-dim); }
-  .peek-rel-item { font-size: 11px; line-height: 1.6; }
-  .peek-time { font-size: 10px; color: var(--ink-dim); line-height: 1.5; }
-  .quick { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
-  .quick button { flex: 1; min-width: 58px; }
-  /* drawer 表单 */
-  #drawer, #sdrawer {
-    position: fixed; top: 0; right: 0; width: 380px; max-width: 100%; height: 100%;
-    background: var(--panel); border-left: 1px solid var(--line); z-index: 50;
-    transform: translateX(100%); transition: transform .2s; display: flex; flex-direction: column;
-  }
-  #drawer.open, #sdrawer.open { transform: translateX(0); }
-  .seg { display: flex; gap: 6px; }
-  .seg button { flex: 1; }
-  .seg button.active { background: var(--accent); color: #1a1a1a; border-color: var(--accent); font-weight: 600; }
-  .mrow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
-  .mrow .swatch2 { width: 14px; height: 14px; border-radius: 3px; flex: none; }
-  .mrow .mname { flex: 1; }
-  .mrow .mcat { font-size: 10px; color: var(--ink-dim); }
-  .add-row { display: flex; gap: 6px; margin-top: 8px; }
-  .add-row input[type=color] { width: 36px; padding: 2px; flex: none; }
-  .drawer-head { padding: 14px 16px; border-bottom: 1px solid var(--line);
-    font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-  .drawer-body { overflow-y: auto; flex: 1; padding: 14px 16px; }
-  label { display: block; font-size: 10px; color: var(--ink-dim); margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.06em; }
-  label:first-child { margin-top: 0; }
+  .quick { display: flex; gap: 6px; margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .quick button { flex: 1; min-width: 0; padding: 6px 8px; font-size: 12px; background: transparent; }
+  .quick button:hover:not(:disabled) { background: var(--panel-2); }
+  /* 设备筛选：吸顶 */
+  .dev-filter { position: sticky; top: -12px; z-index: 5; margin: -12px -12px 10px; padding: 12px 12px 8px; background: var(--bg); }
+  .dev-filter select { padding-top: 7px; padding-bottom: 7px; font-size: 13px; }
+  /* ---------- forms ---------- */
+  label { display: block; font-size: 12.5px; font-weight: 500; color: var(--ink-2); margin: 14px 0 5px; }
   input, select, textarea {
-    width: 100%; font-family: inherit; font-size: 12px; background: var(--bg); color: var(--ink);
-    border: 1px solid var(--line); padding: 8px 9px; border-radius: 5px;
+    width: 100%; font: inherit; font-size: 14px; color: var(--ink); background: var(--field);
+    border: 1px solid var(--line); border-radius: var(--r-s); padding: 9px 11px;
+    -webkit-appearance: none; appearance: none; transition: border-color .15s, box-shadow .15s;
   }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
-  textarea { resize: vertical; min-height: 56px; }
-  .hint { font-size: 10px; color: var(--ink-dim); margin-top: 4px; line-height: 1.5; }
-  .pw-row { display: flex; gap: 6px; } .pw-row input { flex: 1; }
-  .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
-  .toggle-row input { width: auto; }
-  .toggle-row label { margin: 0; text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--ink); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input::placeholder, textarea::placeholder { color: var(--ink-dim); }
+  input[type="password"], input.mono { font-family: var(--mono); }
+  input[type="checkbox"] { -webkit-appearance: auto; appearance: auto; width: 16px; height: 16px; padding: 0; margin: 0; accent-color: var(--accent); flex: none; }
+  input[type="color"] { -webkit-appearance: auto; appearance: auto; height: 38px; padding: 3px; cursor: pointer; }
+  select {
+    padding-right: 32px; background-repeat: no-repeat; background-position: right 10px center; background-size: 14px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237f8493' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+  textarea { resize: vertical; min-height: 76px; line-height: 1.5; }
+  .hint { font-size: 12px; color: var(--ink-dim); margin-top: 6px; line-height: 1.55; }
+  .group { padding: 16px 0; }
+  .group + .group { border-top: 1px solid var(--line); }
+  .drawer-body > .group:first-child { padding-top: 0; }
+  .group-title { display: flex; align-items: baseline; gap: 8px; font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+  .group-sub { font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .quick-actions { padding-bottom: 16px; margin-bottom: 0; border-bottom: 1px solid var(--line); }
+  .quick-actions .seg button { gap: 5px; }
+  .group-title + label, .group-title + .seg, .group-title + .mrow, .group-title + .dev-list, .group-title + input, .group-title + textarea, .group-title + .hint { margin-top: 10px; }
+  .pw-row { display: flex; gap: 6px; }
+  .pw-row input { flex: 1; min-width: 0; }
+  .toggle-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .toggle-row label { margin: 0; font-size: 13px; font-weight: 400; color: var(--ink); cursor: pointer; }
   .btn-row { display: flex; gap: 8px; margin-top: 18px; }
-  .btn-row button { flex: 1; }
-  .hidden { display: none !important; }
-  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-    background: var(--accent); color: #1a1a1a; font-size: 11px; font-weight: 600;
-    padding: 8px 16px; border-radius: 6px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 100; }
-  #toast.show { opacity: 1; }
-  /* 锁屏 */
-  #lock, #login, #config { position: fixed; inset: 0; background: var(--bg); z-index: 200;
-    display: flex; align-items: center; justify-content: center; padding: 20px; }
-  #login, #config { z-index: 210; }
-  #lock .box, #login .box, #config .box { width: 100%; max-width: 360px; }
-  #lock h2, #login h2, #config h2 { font-size: 16px; margin-bottom: 6px; }
-  #lock .lead, #login .lead, #config .lead { font-size: 12px; color: var(--ink-dim); line-height: 1.7; margin-bottom: 20px; }
-  #lock .warn { font-size: 11px; color: var(--danger); margin-top: 12px; line-height: 1.6; }
-  #lock #lockErr, #login #loginErr, #config #cfgErr { font-size: 12px; color: var(--danger); margin-top: 10px; min-height: 16px; }
-  /* 顶部分类 tab：桌面隐藏，仅手机显示 */
+  .btn-row button { flex: 1; padding: 10px 12px; font-size: 14px; }
+  .dev-list { display: flex; flex-direction: column; gap: 5px; }
+  .dev-list label {
+    display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 11px; font-size: 13px; font-weight: 400; color: var(--ink);
+    background: var(--field); border: 1px solid var(--line); border-radius: var(--r-s); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .dev-list label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+  .dev-list span { margin-left: auto; font: 11px var(--mono); color: var(--ink-dim); }
+  .dev-list span.over { font-weight: 600; }
+  .seg { display: flex; gap: 3px; padding: 3px; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-s); }
+  .seg button { flex: 1; padding: 6px 8px; font-size: 13px; color: var(--ink-2); background: transparent; border: 0; border-radius: 5px; }
+  .seg button:hover { color: var(--ink); }
+  .seg button.active { background: var(--ink); color: var(--bg); font-weight: 600; box-shadow: var(--shadow-1); }
+  .mrow { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .mrow .swatch2 { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .mrow .mname { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .mrow .mcat { font: 11px var(--mono); color: var(--ink-dim); text-transform: uppercase; }
+  .mrow .mini { color: var(--ink-dim); }
+  .mrow .mini:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+  .add-row { display: flex; gap: 6px; margin-top: 10px; }
+  .add-row input[type="color"] { width: 42px; flex: none; }
+  /* ---------- drawers ---------- */
+  #scrim { position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .22s; }
+  body:has(#drawer.open, #sdrawer.open) #scrim { opacity: 1; pointer-events: auto; }
+  #drawer, #sdrawer {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 50; width: 400px; max-width: 100%;
+    display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--line);
+    box-shadow: -16px 0 40px -20px rgba(0,0,0,.6); transform: translateX(100%); visibility: hidden;
+    transition: transform .26s cubic-bezier(.32,.72,0,1), visibility 0s linear .26s;
+  }
+  #drawer.open, #sdrawer.open { transform: none; visibility: visible; transition: transform .26s cubic-bezier(.32,.72,0,1), visibility 0s; }
+  .drawer-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: max(14px, env(safe-area-inset-top)) 18px 14px; border-bottom: 1px solid var(--line); font-size: 15px; font-weight: 600;
+  }
+  .drawer-head .title { display: flex; align-items: center; gap: 8px; }
+  .drawer-body { flex: 1; overflow-y: auto; padding: 16px 18px max(18px, env(safe-area-inset-bottom)); }
+  /* ---------- peek ---------- */
+  #peek {
+    margin: auto; width: min(360px, calc(100% - 32px)); max-height: 72vh; overflow-y: auto; padding: 0;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: var(--r-l); box-shadow: var(--shadow-2);
+    opacity: 0; transform: translateY(8px) scale(.98);
+    transition: opacity .16s, transform .16s, overlay .16s allow-discrete, display .16s allow-discrete;
+  }
+  #peek:popover-open { opacity: 1; transform: none; }
+  @starting-style { #peek:popover-open { opacity: 0; transform: translateY(8px) scale(.98); } }
+  #peek::backdrop { background: rgba(0,0,0,.35); pointer-events: none; }
+  .peek-head { padding: 14px 16px 12px; border-top: 3px solid var(--c); border-bottom: 1px solid var(--line); }
+  .peek-plat { font-size: 11px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--c); }
+  .peek-name { margin-top: 2px; font: 600 15px var(--mono); overflow-wrap: anywhere; }
+  .peek-sec { padding: 12px 16px 0; }
+  .peek-sec:last-child { padding-bottom: 14px; }
+  .peek-lbl { font-size: 11px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 4px; }
+  .peek-note { font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .peek-empty { color: var(--ink-dim); }
+  .peek-rel-item { display: flex; align-items: baseline; gap: 7px; font-size: 12.5px; line-height: 1.7; }
+  .peek-rel-item .plat { font-size: 10.5px; }
+  .peek-rel-item .how { margin-left: auto; color: var(--ink-dim); font-size: 11.5px; }
+  .peek-time { font: 11.5px/1.7 var(--mono); color: var(--ink-dim); }
+  /* ---------- toast ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 300; max-width: calc(100% - 32px);
+    background: var(--ink); color: var(--bg); font-size: 13px; font-weight: 500; text-align: center;
+    padding: 9px 16px; border-radius: 999px; box-shadow: var(--shadow-2);
+    opacity: 0; transform: translate(-50%, 10px); transition: opacity .2s, transform .2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  /* ---------- gates: login / lock ---------- */
+  .gate {
+    position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 24px;
+    background:
+      radial-gradient(640px 420px at 18% 8%, var(--accent-soft), transparent 65%),
+      radial-gradient(520px 420px at 88% 92%, color-mix(in srgb, var(--cat-ai), transparent 86%), transparent 65%),
+      var(--bg);
+  }
+  #login { z-index: 210; }
+  .gate .box { width: 100%; max-width: 400px; padding: 28px 28px 24px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-l); box-shadow: var(--shadow-2); }
+  .gate .brand { margin-bottom: 20px; }
+  .gate .brand .mark { width: 32px; height: 32px; }
+  .gate .brand h1 { font-size: 14px; color: var(--ink-2); font-weight: 600; }
+  .gate h2 { font-size: 19px; font-weight: 650; margin-bottom: 6px; }
+  .gate .lead { font-size: 13px; color: var(--ink-dim); line-height: 1.6; margin-bottom: 16px; }
+  .gate .err { font-size: 13px; color: var(--danger); margin-top: 10px; min-height: 18px; }
+  .gate .box:has(.err:not(:empty)) input { border-color: var(--danger); }
+  .gate .warn { margin-top: 14px; padding: 10px 12px; font-size: 12.5px; line-height: 1.6; color: var(--danger); background: var(--danger-soft); border-radius: var(--r-s); }
+  .gate .foot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--ink-dim); display: flex; align-items: center; gap: 6px; }
+  .gate .foot .ic { width: 13px; height: 13px; }
+  /* ---------- mobile ---------- */
   .tabbar { display: none; }
-  /* 仅手机可见的元素（如设置抽屉里的快捷操作） */
   .mobile-only { display: none; }
   @media (max-width: 760px) {
-    /* 分类切换 tab 栏 */
-    .tabbar { display: flex; gap: 1px; background: var(--line); border-bottom: 1px solid var(--line); }
-    .tabbar button {
-      flex: 1; min-height: 46px; border: none; border-radius: 0; background: var(--bg);
-      font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;
-    }
-    .tabbar button:hover { border: none; }
-    .tabbar button.active { background: var(--panel-2); color: var(--accent); font-weight: 600; }
-    .tabbar .bar { width: 3px; height: 14px; border-radius: 2px; }
-    /* 三列 → 单列：只显活动列，整页一条竖列表自然滚动 */
-    main { flex-direction: column; overflow-y: auto; }
+    header.top { padding-left: 14px; padding-right: 14px; gap: 8px; }
+    .search { order: 10; flex-basis: 100%; max-width: none; }
+    .search kbd { display: none; }
+    #connState, #lockNow, #logout, #export, .actions .sep { display: none; }
+    .mobile-only { display: block; }
+    .tabbar { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--bg); }
+    .tabbar button { flex: 1; min-height: 40px; gap: 6px; font-size: 13px; color: var(--ink-2); background: transparent; border-color: transparent; border-radius: var(--r-m); }
+    .tabbar button .ic { width: 16px; height: 16px; color: var(--c); }
+    .tabbar button.active { background: var(--panel); border-color: var(--line); color: var(--ink); font-weight: 600; box-shadow: var(--shadow-1); }
+    .tabbar .count { margin-left: 0; background: transparent; padding: 0; }
+    main { flex-direction: column; overflow-y: auto; gap: 0; background: var(--bg); }
     .column { display: none; }
     .column.active { display: flex; flex: 1; min-height: 0; }
     .col-head { display: none; }
-    .col-body { overflow: visible; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-    /* 触控热区放大 + 抽屉占满 */
-    header button, .quick button { min-height: 40px; }
-    .mobile-only { display: block; }
-    #drawer, #sdrawer { width: 100%; }
-    /* 手机 header 收纳：锁定/退出/导出 移进设置抽屉 */
-    #lockNow, #logout, #export { display: none; }
+    .col-body { overflow: visible; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+    .card:hover { transform: none; }
+    .quick button { min-height: 38px; }
+    #drawer, #sdrawer { width: 100%; border-left: 0; }
+    /* 16px 起步，iOS 聚焦不再自动放大 */
+    input, select, textarea, .search input { font-size: 16px; }
+    .dev-filter select { font-size: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
   }
 </style>
 <script src="/theme.js"></script>
 </head>
 <body>
-<div id="login" style="display:none">
+<svg class="sprite" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-mark" viewBox="0 0 24 24">
+    <path d="M12 7 6.5 17M12 7v10M12 7l5.5 10" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="12" cy="7" r="2.6" fill="currentColor" stroke="none"/>
+    <circle cx="6.5" cy="17" r="2.6" fill="var(--cat-email)" stroke="none"/>
+    <circle cx="12" cy="17" r="2.6" fill="var(--cat-apple)" stroke="none"/>
+    <circle cx="17.5" cy="17" r="2.6" fill="var(--cat-ai)" stroke="none"/>
+  </symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
+  <symbol id="i-id" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 17a3.5 3.5 0 0 1 7 0M14 9h4M14 13h4"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3c.6 4.6 3.4 7.4 9 9-5.6 1.6-8.4 4.4-9 9-.6-4.6-3.4-7.4-9-9 5.6-1.6 8.4-4.4 9-9Z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.6 3.2 8.4 7.5 9.5 4.3-1.1 7.5-4.9 7.5-9.5V6L12 3Z"/><path d="m9 12 2 2 4-4"/></symbol>
+</svg>
+
+<div id="login" class="gate" style="display:none">
   <div class="box">
-    <h2>账号图谱<span style="color:var(--accent)">.</span> 登录</h2>
+    <div class="brand"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg><h1>账号图谱</h1></div>
+    <h2>登录</h2>
     <div class="lead">使用管理员账号登录。登录密码与保险库主密码相互独立。</div>
-    <label>邮箱</label>
-    <input type="email" id="loginEmail" autocomplete="username">
-    <label>密码</label>
+    <label for="loginEmail">邮箱</label>
+    <input type="email" id="loginEmail" class="mono" autocomplete="username" spellcheck="false">
+    <label for="loginPw">密码</label>
     <input type="password" id="loginPw" autocomplete="current-password">
     <div class="btn-row"><button class="primary" id="loginBtn">登录</button></div>
-    <div id="loginErr"></div>
+    <div id="loginErr" class="err"></div>
   </div>
 </div>
 
-<div id="lock">
+<div id="lock" class="gate">
   <div class="box">
-    <h2>账号图谱<span style="color:var(--accent)">.</span></h2>
+    <div class="brand"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg><h1>账号图谱</h1></div>
+    <h2>解锁保险库</h2>
     <div class="lead" id="lockLead">输入主密码以解锁。</div>
-    <label>主密码 Master Password</label>
+    <label for="mpw">主密码</label>
     <input type="password" id="mpw" autocomplete="off" autofocus>
     <div class="btn-row"><button class="primary" id="unlockBtn">解锁</button></div>
-    <div id="lockErr"></div>
-    <div class="warn" id="lockWarn" style="display:none">⚠️ 首次使用：请牢记这个主密码。它不上传、无法找回，丢失则所有密码永久无法解密。</div>
+    <div id="lockErr" class="err"></div>
+    <div class="warn" id="lockWarn" style="display:none">首次使用：请牢记这个主密码。它不上传、无法找回，丢失则所有密码永久无法解密。</div>
+    <div class="foot"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>密码与 2FA 密钥在浏览器本地加密（AES-256-GCM），服务器只保存密文。</div>
   </div>
 </div>
 
-<header>
-  <h1>账号图谱<span class="dot">.</span></h1>
-  <span class="sub">分类树 · v4</span>
+<header class="top">
+  <div class="brand"><svg class="mark" aria-hidden="true"><use href="#i-mark"/></svg><h1>账号图谱</h1></div>
+  <label class="search" aria-label="搜索账号">
+    <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+    <input id="q" type="search" placeholder="搜索账号、平台、手机、备注…" autocomplete="off" spellcheck="false">
+    <kbd>/</kbd>
+  </label>
   <span class="spacer"></span>
   <span id="connState"></span>
-  <button class="primary" id="add">+ 账号</button>
-  <button class="ghost" id="settings">⚙ 设置</button>
-  <button class="ghost" id="lockNow">🔒 锁定</button>
-  <button class="ghost" id="logout">退出登录</button>
-  <button class="ghost" id="export">导出</button>
+  <div class="actions">
+    <button class="primary" id="add"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>账号</button>
+    <button class="icon" id="settings" aria-label="设置" title="设置"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg></button>
+    <span class="sep"></span>
+    <button class="icon" id="export" aria-label="导出备份" title="导出备份（含密文）"><svg class="ic" aria-hidden="true"><use href="#i-download"/></svg></button>
+    <button class="icon" id="lockNow" aria-label="锁定" title="锁定保险库"><svg class="ic" aria-hidden="true"><use href="#i-lock"/></svg></button>
+    <button class="icon" id="logout" aria-label="退出登录" title="退出登录"><svg class="ic" aria-hidden="true"><use href="#i-logout"/></svg></button>
+  </div>
 </header>
 
 <nav id="tabbar" class="tabbar">
-  <button data-tab="email" class="active"><span class="bar" style="background:var(--cat-email)"></span>📧 EMAIL <span id="tab-count-email"></span></button>
-  <button data-tab="apple"><span class="bar" style="background:var(--cat-apple)"></span>🍎 APPLE <span id="tab-count-apple"></span></button>
-  <button data-tab="ai"><span class="bar" style="background:var(--cat-ai)"></span>🤖 AI <span id="tab-count-ai"></span></button>
+  <button data-tab="email" class="active"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg>Email<span class="count" id="tab-count-email"></span></button>
+  <button data-tab="apple"><svg class="ic" aria-hidden="true"><use href="#i-id"/></svg>Apple<span class="count" id="tab-count-apple"></span></button>
+  <button data-tab="ai"><svg class="ic" aria-hidden="true"><use href="#i-spark"/></svg>AI 工具<span class="count" id="tab-count-ai"></span></button>
 </nav>
 
 <main>
-  <div class="column" data-cat="email">
-    <div class="col-head"><span class="bar" style="background:var(--cat-email)"></span>📧 EMAIL <span class="count" id="count-email"></span></div>
+  <section class="column" data-cat="email">
+    <div class="col-head"><svg class="ic" aria-hidden="true"><use href="#i-mail"/></svg>Email<span class="count" id="count-email"></span></div>
     <div class="col-body" id="col-email"></div>
-  </div>
-  <div class="column" data-cat="apple">
-    <div class="col-head"><span class="bar" style="background:var(--cat-apple)"></span>🍎 APPLE <span class="count" id="count-apple"></span></div>
+  </section>
+  <section class="column" data-cat="apple">
+    <div class="col-head"><svg class="ic" aria-hidden="true"><use href="#i-id"/></svg>Apple<span class="count" id="count-apple"></span></div>
     <div class="col-body" id="col-apple"></div>
-  </div>
-  <div class="column" data-cat="ai">
-    <div class="col-head"><span class="bar" style="background:var(--cat-ai)"></span>🤖 AI 工具 <span class="count" id="count-ai"></span></div>
+  </section>
+  <section class="column" data-cat="ai">
+    <div class="col-head"><svg class="ic" aria-hidden="true"><use href="#i-spark"/></svg>AI 工具<span class="count" id="count-ai"></span></div>
     <div class="col-body" id="col-ai"></div>
-  </div>
+  </section>
 </main>
 
-<div id="drawer">
-  <div class="drawer-head"><span id="drawerTitle">新增账号</span><button class="ghost mini" id="drawerClose">✕</button></div>
+<div id="scrim"></div>
+<aside id="drawer" aria-label="账号表单">
+  <div class="drawer-head"><span class="title" id="drawerTitle">新增账号</span><button class="icon" id="drawerClose" aria-label="关闭"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <div class="drawer-body" id="drawerBody"></div>
-</div>
+</aside>
 
-<div id="sdrawer">
-  <div class="drawer-head"><span>⚙ 设置</span><button class="ghost mini" id="sdrawerClose">✕</button></div>
+<aside id="sdrawer" aria-label="设置">
+  <div class="drawer-head"><span class="title"><svg class="ic" aria-hidden="true"><use href="#i-gear"/></svg>设置</span><button class="icon" id="sdrawerClose" aria-label="关闭"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button></div>
   <div class="drawer-body" id="sdrawerBody"></div>
-</div>
+</aside>
 
 <div id="peek" popover></div>
-<div id="toast"></div>
+<div id="toast" role="status"></div>
 
 <script type="module" src="/app.js"></script>
 

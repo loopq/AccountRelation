@@ -3,11 +3,9 @@
     "argv": [
       "/opt/homebrew/Cellar/node/25.6.0/bin/node",
       "<ACCOUNT_RELATION_REPO>/node_modules/.bin/playwright",
-      "test",
-      "-c",
-      "/tmp/ag-pw/chrome.config.mjs"
+      "test"
     ],
-    "configFile": "/tmp/ag-pw/chrome.config.mjs",
+    "configFile": "<ACCOUNT_RELATION_REPO>/playwright.config.js",
     "rootDir": "<ACCOUNT_RELATION_REPO>/test",
     "failOnFlakyTests": false,
     "forbidOnly": false,
@@ -24,7 +22,7 @@
     "preserveOutput": "always",
     "projects": [
       {
-        "outputDir": "/tmp/ag-pw/results",
+        "outputDir": "<ACCOUNT_RELATION_REPO>/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -44,7 +42,7 @@
       {
         "grep": {},
         "grepInvert": null,
-        "outputDir": "/tmp/ag-pw/results",
+        "outputDir": "<ACCOUNT_RELATION_REPO>/test-results",
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
@@ -61,8 +59,7 @@
           "headless": true,
           "actionTimeout": 10000,
           "screenshot": "only-on-failure",
-          "trace": "retain-on-failure",
-          "channel": "chrome"
+          "trace": "retain-on-failure"
         },
         "dependencies": [],
         "ignoreSnapshots": false,
@@ -78,7 +75,7 @@
       [
         "json",
         {
-          "outputFile": "<ACCOUNT_RELATION_REPO>/docs/agents/browser-test-results.json"
+          "outputFile": "docs/agents/browser-test-results.json"
         }
       ]
     ],
@@ -96,8 +93,7 @@
       "command": "node test/browser-server.js",
       "url": "http://127.0.0.1:3107/health",
       "reuseExistingServer": false,
-      "timeout": 30000,
-      "cwd": "<ACCOUNT_RELATION_REPO>"
+      "timeout": 30000
     }
   },
   "suites": [
@@ -123,12 +119,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 6621,
+                  "duration": 9160,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-10T06:28:45.288Z",
+                  "startTime": "2026-11-11T02:09:32.434Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -157,12 +153,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2585,
+                  "duration": 2564,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-10T06:28:52.567Z",
+                  "startTime": "2026-11-11T02:09:41.865Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -180,8 +176,8 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-10T06:28:44.081Z",
-    "duration": 11163.1,
+    "startTime": "2026-11-11T02:09:31.227Z",
+    "duration": 13262.334,
     "expected": 2,
     "skipped": 0,
     "unexpected": 0,
