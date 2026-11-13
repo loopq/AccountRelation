@@ -15,6 +15,7 @@ self.addEventListener('install',e=>e.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch',e=>{if(new URL(e.request.url).pathname==='/api/state')e.respondWith(caches.match('/api/state'));});
 `));
-app.use(await createApp(store,{origin:'http://127.0.0.1:3107'}));
+// WebAuthn 不接受 IP 作 rpId，浏览器侧统一走 localhost
+app.use(await createApp(store,{origin:'http://localhost:3107'}));
 const server=app.listen(3107,'127.0.0.1');
 for(const signal of ['SIGTERM','SIGINT']) process.once(signal,()=>server.close(()=>{store.db.close();rmSync(dir,{recursive:true,force:true});process.exit(0);}));

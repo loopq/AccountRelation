@@ -1,0 +1,27 @@
+# 2026-11-13 #18 Face ID 发布后公网核对（release 16ee2c030ea550dae2f6）
+PUBLIC_index.html_SHA256_MATCH 10/10 eef02028f0ee141e817f504a5232b5722b2bbdb4d44081219ab31c00550b1cd2
+PUBLIC_app.js_SHA256_MATCH 10/10 725d2cff3b3cf1a154c6501ec767e3c21992e241e2a650c18a1e4a1f26336c46
+PUBLIC_crypto.js_SHA256_MATCH 10/10 9bbf1b76fb7200773cb43f8ff1aa553e84f34eb44d1af56a22b105aa59a38ed0
+HEALTH 200
+ANON_STATE 401
+ANON_REGISTER_OPTIONS 401
+ANON_PASSKEYS 401
+LOGIN_OPTIONS {"enabled":false}
+LOGIN_OPTIONS_CROSS_ORIGIN 403
+# 浏览器冒烟第 1 次运行失败（本机工具问题，与线上无关）：脚本放在临时目录，ESM 解析不到 @playwright/test
+# Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@playwright/test' imported from <TMPDIR>/ar-smoke/smoke.mjs
+# 改为绝对路径导入后重跑，结果如下（Chromium 桌面 + WebKit iPhone 15 模拟，未登录）
+chromium LOGIN_VISIBLE true PK_BUTTON_VISIBLE false PUBLICKEYCREDENTIAL function PAGE_ERRORS []
+webkit-iphone LOGIN_VISIBLE true PK_BUTTON_VISIBLE false PUBLICKEYCREDENTIAL function PAGE_ERRORS []
+
+# 2026-11-13 修复发布后公网核对（release a593a252f55e01c1e4bd：解锁改为显式 allowCredentials）
+PUBLIC_index.html_SHA256_MATCH 10/10
+PUBLIC_app.js_SHA256_MATCH 10/10
+LOGIN_OPTIONS_SHAPE {"enabled":true,"rpId":"account.loopq.cn","allowCredentials":1,"userVerification":"required"}
+chromium LOGIN_VISIBLE true PK_BUTTON_VISIBLE false PUBLICKEYCREDENTIAL function PAGE_ERRORS []
+webkit-iphone LOGIN_VISIBLE true PK_BUTTON_VISIBLE false PUBLICKEYCREDENTIAL function PAGE_ERRORS []
+
+# 2026-11-13 第二次修复发布后公网核对（release a85ce45876185a75950c：能力检测改用 getClientCapabilities，开启不再预先拦截）
+PUBLIC_app.js_SHA256_MATCH 10/10
+chromium LOGIN_VISIBLE true PK_BUTTON_VISIBLE false PUBLICKEYCREDENTIAL function PAGE_ERRORS []
+webkit-iphone LOGIN_VISIBLE true PK_BUTTON_VISIBLE true PUBLICKEYCREDENTIAL function PAGE_ERRORS []

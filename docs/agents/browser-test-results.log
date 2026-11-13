@@ -3,9 +3,13 @@
 > playwright test
 
 
-Running 2 tests using 1 worker
+Running 3 tests using 1 worker
 
-  ✓  1 test/browser.spec.js:10:1 › full user workflow and no plaintext in API/storage; desktop and mobile (9.2s)
+  ✓  1 test/browser.spec.js:10:1 › full user workflow and no plaintext in API/storage; desktop and mobile (8.3s)
   ✓  2 test/browser.spec.js:134:1 › legacy service worker and sensitive cache removed before new API calls (2.6s)
+[WebServer] (node:85775) ExperimentalWarning: The supports Web Crypto API method is an experimental feature and might change at any time
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:85775) ExperimentalWarning: The ML-DSA-44 Web Crypto API algorithm is an experimental feature and might change at any time
+  ✓  3 test/browser.spec.js:172:1 › Face ID passkey: one gesture logs in and unlocks; replay, idle lock, rotation and no-PRF fallback (6.1s)
 
-  2 passed (13.3s)
+  3 passed (18.6s)

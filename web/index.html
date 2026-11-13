@@ -347,6 +347,7 @@
     <label for="loginPw">密码</label>
     <input type="password" id="loginPw" autocomplete="current-password">
     <div class="btn-row"><button class="primary" id="loginBtn">登录</button></div>
+    <div class="btn-row" style="display:none;margin-top:8px"><button class="ghost" id="pkLogin" data-passkey>Face ID 解锁</button></div>
     <div id="loginErr" class="err"></div>
   </div>
 </div>
@@ -359,6 +360,7 @@
     <label for="mpw">主密码</label>
     <input type="password" id="mpw" autocomplete="off" autofocus>
     <div class="btn-row"><button class="primary" id="unlockBtn">解锁</button></div>
+    <div class="btn-row" style="display:none;margin-top:8px"><button class="ghost" id="pkUnlock" data-passkey>Face ID 解锁</button></div>
     <div id="lockErr" class="err"></div>
     <div class="warn" id="lockWarn" style="display:none">首次使用：请牢记这个主密码。它不上传、无法找回，丢失则所有密码永久无法解密。</div>
     <div class="foot"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg>密码与 2FA 密钥在浏览器本地加密（AES-256-GCM），服务器只保存密文。</div>

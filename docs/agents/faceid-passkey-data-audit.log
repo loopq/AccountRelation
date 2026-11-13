@@ -1,0 +1,92 @@
+# 2026-11-13 #18 Face ID（passkey + PRF）：生产库只读核对（只输出行数与内容指纹，不输出数据）
+# 脚本：容器内 better-sqlite3 readonly 打开；admins/sessions 随登录变化，只计数；passkeys 只计数
+
+## 发布前（release c9c611f1ff5831bd6a01，/data/account.db）
+USER_VERSION 2
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=1
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=b993ce3585ff4be1
+platforms count=6 fp=f0b6ad80ce25a1d8
+countries count=7 fp=13d3575ef4b81365
+accounts count=25 fp=4ce2c70d77510038
+devices count=6 fp=ebe4c234100ea947
+account_devices count=14 fp=0b80b05a604ba967
+passkeys absent
+
+## 发布后（release 16ee2c030ea550dae2f6，/data/account.db）
+USER_VERSION 3
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=1
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=b993ce3585ff4be1
+platforms count=6 fp=f0b6ad80ce25a1d8
+countries count=7 fp=13d3575ef4b81365
+accounts count=25 fp=4ce2c70d77510038
+devices count=6 fp=ebe4c234100ea947
+account_devices count=14 fp=0b80b05a604ba967
+passkeys count=0
+
+## 修复发布前（release 16ee2c030ea550dae2f6，用户真机开启过 1 个 passkey）
+USER_VERSION 3
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=1
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=b993ce3585ff4be1
+platforms count=6 fp=f0b6ad80ce25a1d8
+countries count=7 fp=13d3575ef4b81365
+accounts count=25 fp=4ce2c70d77510038
+devices count=6 fp=ebe4c234100ea947
+account_devices count=14 fp=0b80b05a604ba967
+passkeys count=1
+
+## 修复发布后（release a593a252f55e01c1e4bd）
+USER_VERSION 3
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=1
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=b993ce3585ff4be1
+platforms count=6 fp=f0b6ad80ce25a1d8
+countries count=7 fp=13d3575ef4b81365
+accounts count=25 fp=4ce2c70d77510038
+devices count=6 fp=ebe4c234100ea947
+account_devices count=14 fp=0b80b05a604ba967
+passkeys count=1
+
+## 第二次修复发布前（release a593a252f55e01c1e4bd）
+USER_VERSION 3
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=2
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=b993ce3585ff4be1
+platforms count=6 fp=f0b6ad80ce25a1d8
+countries count=7 fp=13d3575ef4b81365
+accounts count=25 fp=4ce2c70d77510038
+devices count=6 fp=ebe4c234100ea947
+account_devices count=14 fp=0b80b05a604ba967
+passkeys count=0
+
+## 第二次修复发布后（release a85ce45876185a75950c）
+USER_VERSION 3
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=2
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=b993ce3585ff4be1
+platforms count=6 fp=f0b6ad80ce25a1d8
+countries count=7 fp=13d3575ef4b81365
+accounts count=25 fp=4ce2c70d77510038
+devices count=6 fp=ebe4c234100ea947
+account_devices count=14 fp=0b80b05a604ba967
+passkeys count=1

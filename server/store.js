@@ -17,7 +17,7 @@ export function openStore(filename) {
   db.pragma('busy_timeout = 5000');
   db.pragma('synchronous = FULL');
   const version = db.pragma('user_version', { simple: true });
-  if (version > 2) throw new Error('Database schema is newer than this server');
+  if (version > 3) throw new Error('Database schema is newer than this server');
   if (version === 0) db.transaction(() => {
     db.exec(`
       CREATE TABLE platforms (id TEXT PRIMARY KEY, category TEXT NOT NULL CHECK(category IN ('email','apple','ai')),
@@ -58,6 +58,15 @@ export function openStore(filename) {
         PRIMARY KEY (account_id, device_id));
       CREATE INDEX account_devices_device ON account_devices(device_id);
       PRAGMA user_version=2;
+    `);
+  })();
+  // wrapped_key = 用该 passkey 的 PRF 输出加密的保险库 key；服务端没有 PRF 输出，解不开
+  if (version < 3) db.transaction(() => {
+    db.exec(`
+      CREATE TABLE passkeys (credential_id TEXT PRIMARY KEY, public_key TEXT NOT NULL,
+        sign_count INTEGER NOT NULL, wrapped_key TEXT NOT NULL, label TEXT NOT NULL,
+        created_at TEXT NOT NULL, last_used_at TEXT);
+      PRAGMA user_version=3;
     `);
   })();
 
@@ -170,6 +179,8 @@ export function openStore(filename) {
       statement.run(update.ct ?? null,update.fa ?? null,now(),row.id);
     }
     db.prepare('UPDATE vault_meta SET salt=?,canary=? WHERE id=1').run(data.salt,data.canary);
+    // 旧 passkey 包的是旧 key，同一事务里作废，不留「包裹过期」的中间态
+    db.prepare('DELETE FROM passkeys').run();
   }
   return { db, snapshot, mutate, saveAccount, deleteAccount, saveLookup, deleteLookup, initVault, rotate };
 }

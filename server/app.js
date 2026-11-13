@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { createAuth, equal } from './auth.js';
+import { createPasskeys } from './passkey.js';
 import * as v from './validation.js';
 
 const webDir = resolve(dirname(fileURLToPath(import.meta.url)),'../web');
@@ -15,6 +16,7 @@ export async function createApp(store, { origin = 'http://127.0.0.1:3000', produ
   app.disable('x-powered-by');
   app.set('trust proxy',production ? 1 : false);
   const auth = await createAuth(store.db,{ production,loginLimit,sessionSeconds });
+  const passkeys = createPasskeys(store.db,{ origin,auth });
   app.use((req,res,next) => {
     res.set({ 'X-Content-Type-Options':'nosniff', 'Referrer-Policy':'no-referrer', 'X-Frame-Options':'DENY',
       'Permissions-Policy':'camera=(), microphone=(), geolocation=()',
@@ -38,6 +40,8 @@ export async function createApp(store, { origin = 'http://127.0.0.1:3000', produ
     res.json(session ? { authenticated:true,csrf:session.csrf,expiresAt:session.expires_at } : { authenticated:false });
   });
   app.post('/api/login',async (req,res) => res.json(await auth.login(req,res,v.parse(v.login,req.body))));
+  app.post('/api/passkey/login/options',async (_req,res) => res.json(await passkeys.loginOptions()));
+  app.post('/api/passkey/login',async (req,res) => res.json(await passkeys.login(req,res,req.body)));
   app.use('/api',(req,_res,next) => {
     const session = auth.session(req);
     if (!session) throw new v.HttpError(401,'请重新登录');
@@ -46,6 +50,10 @@ export async function createApp(store, { origin = 'http://127.0.0.1:3000', produ
   });
   app.post('/api/logout',(req,res) => { auth.revoke(req,res); res.json({ ok:true }); });
   app.get('/api/state',(_req,res) => res.json(store.snapshot()));
+  app.post('/api/passkey/register/options',async (_req,res) => res.json(await passkeys.registerOptions()));
+  app.post('/api/passkey/register',async (req,res) => res.json(await passkeys.register(req.body)));
+  app.get('/api/passkeys',(_req,res) => res.json(passkeys.list()));
+  app.delete('/api/passkeys/:id',(req,res) => res.json(passkeys.remove(req.params.id)));
   function mutation(schema, operation, initializing = false) {
     return (req,res) => {
       const body = v.parse(v.change.extend({ data:schema }),req.body);

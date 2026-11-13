@@ -1,5 +1,5 @@
 import { request } from './api-client.js';
-import { CANARY_PLAIN, b64, unb64, deriveKey, encryptWith, decryptWith } from './crypto.js';
+import { CANARY_PLAIN, b64, unb64, deriveKey, deriveRaw, importVaultKey, prfWrapKey, encryptWith, decryptWith } from './crypto.js';
 
 // Remove obsolete credentials and exportable vault keys from older deployments.
 sessionStorage.removeItem('ag_masterkey');
@@ -51,8 +51,18 @@ async function unlock(password) {
   if (operationEpoch !== epoch) throw new Error('解锁已取消');
   masterKey = key; unlockedSalt = salt;
 }
+/** Face ID：PRF 输出解开服务端存的包裹 key，再用 canary 确认 */
+async function unlockWithPrf(prf,wrappedKey) {
+  if (!prf) throw new Error('没有 PRF 输出');
+  const operationEpoch = epoch;
+  const meta = (await api('/state')).vault;
+  const key = await importVaultKey(unb64(await decryptWith(await prfWrapKey(prf),wrappedKey)));
+  if (!meta || await decryptWith(key,meta.canary) !== CANARY_PLAIN) throw new Error('canary 不符');
+  if (operationEpoch !== epoch) throw new Error('解锁已取消');
+  masterKey = key; unlockedSalt = meta.salt;
+}
 function clearSensitive() {
-  epoch++; masterKey = null; unlockedSalt = null; state = emptyState();
+  epoch++; masterKey = null; unlockedSalt = null; state = emptyState(); enrolling = null;
   const peek = document.getElementById('peek');
   peek.togglePopover?.(false);
   peek.replaceChildren();
@@ -71,6 +81,7 @@ function lock() {
   clearSensitive();
   document.getElementById('lock').style.display = 'flex';
   updateLockUI();
+  preparePasskey();
   document.getElementById('mpw').focus();
 }
 async function updateLockUI() {
@@ -625,6 +636,13 @@ function renderSettings() {
       <div class="hint">会用新密码重新加密所有条目（事务原子，失败不损坏）。建议先导出备份。</div>
     </div>
     <div class="group">
+      <div class="group-title">Face ID 解锁 <span class="group-sub">一次验证 = 登录 + 解锁</span></div>
+      <div id="pkList"></div>
+      <input type="password" id="pkMpw" placeholder="当前主密码（开启前验证）" autocomplete="off" style="margin-top:6px">
+      <div class="btn-row"><button id="pkStep">验证主密码</button></div>
+      <div class="hint" id="pkMsg">需要 iOS 18.4 以上，或支持 PRF 的桌面浏览器。改主密码后要重新开启。</div>
+    </div>
+    <div class="group">
       <div class="group-title">批量导入</div>
       <textarea id="importJson" class="mono" placeholder='[{"platform":"Gmail","name":"x@gmail.com","password":"...","recovery_email":"...","twofa_secret":"...","phone":"...","twofa_enabled":true}]' style="min-height:96px" spellcheck="false"></textarea>
       <div class="btn-row"><button id="importBtn">解析并导入</button></div>
@@ -647,6 +665,9 @@ function renderSettings() {
   body.querySelector('#addDev').onclick = addDevice;
   body.querySelector('#changeMpw').onclick = () => doChangeMasterPassword().catch(e=>toast(e.message));
   body.querySelector('#importBtn').onclick = doBatchImport;
+  enrolling = null;
+  body.querySelector('#pkStep').onclick = enrollStep;
+  refreshPasskeys();
 }
 
 async function addPlatform() {
@@ -710,7 +731,7 @@ async function doChangeMasterPassword() {
   btn.disabled = true; btn.textContent = '重新加密中…';
   try {
     await changeMasterPassword(p1);
-    toast('主密码已更改');
+    toast('主密码已更改；开启过的 Face ID 需重新开启');
     sdrawer.classList.remove('open');
   } catch (e) {
     toast('更改未完成，请重新解锁确认: ' + (e.message || e));
@@ -782,25 +803,194 @@ async function doUnlock() {
   try {
     await unlock(pw);
     mpwInput.value = '';
-    document.getElementById('lock').style.display = 'none';
-    await loadAll();
+    await openVault();
   } catch (e) { document.getElementById('lockErr').textContent = e.message || '解锁失败'; }
   finally { unlockBtn.disabled = false; unlockBtn.textContent = '解锁'; }
 }
 unlockBtn.onclick = doUnlock;
 mpwInput.addEventListener('keydown', e => { if (e.key === 'Enter') doUnlock(); });
 
+async function openVault() {
+  document.getElementById('login').style.display = 'none';
+  document.getElementById('lock').style.display = 'none';
+  await loadAll();
+}
+
+// ============ Face ID（passkey + PRF） ============
+// 一次 Face ID = 服务端验签发会话 + PRF 解开保险库 key；两个门禁页走同一条路径。
+const PRF_INPUT = new TextEncoder().encode('account-relation/vault-prf/v1');
+const fromB64u = s => unb64(s.replace(/-/g,'+').replace(/_/g,'/'));
+const toB64u = buf => b64(buf).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const prfOf = c => { const r = c.getClientExtensionResults().prf?.results?.first; return r ? new Uint8Array(r) : null; };
+// 只序列化验签需要的字段：PRF 输出是解保险库的秘密，绝不发给服务端
+function credentialJSON(c) {
+  const r = c.response, response = { clientDataJSON:toB64u(r.clientDataJSON) };
+  if (r.attestationObject) Object.assign(response,{ attestationObject:toB64u(r.attestationObject),transports:r.getTransports?.() || [] });
+  else Object.assign(response,{ authenticatorData:toB64u(r.authenticatorData),signature:toB64u(r.signature),
+    ...(r.userHandle ? { userHandle:toB64u(r.userHandle) } : {}) });
+  return { id:c.id,rawId:toB64u(c.rawId),type:c.type,response,clientExtensionResults:{} };
+}
+// iOS 26.2 起没有任何通行密钥管理器（「密码」/ 1Password 等）时 isUVPAA 返回 false；
+// 同版本 Chrome 等 WKWebView 浏览器里 isUVPAA 一律 false（26.3 修复），所以优先用 getClientCapabilities
+const passkeyReady = (async () => {
+  try {
+    if (!window.PublicKeyCredential) return false;
+    const caps = await PublicKeyCredential.getClientCapabilities?.();
+    if (caps && 'userVerifyingPlatformAuthenticator' in caps) return !!caps.userVerifyingPlatformAuthenticator;
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch { return false; }
+})();
+const credentialList = list => (list || []).map(c => ({ ...c,id:fromB64u(c.id) }));
+// 附上系统原始错误：真机上的失败原因只有这里看得到
+const webauthnError = e => {
+  const hint = e?.name === 'NotAllowedError' ? '已取消，或本设备找不到可用的通行密钥'
+    : e?.name === 'InvalidStateError' ? '这台设备（或同一钥匙串 / 密码管理器）已经开启过' : 'Face ID 调用失败';
+  return `${hint}（${e?.name || 'Error'}: ${e?.message || '无详情'}）`;
+};
+
+// iOS 只在用户点击的同步调用栈里放行 Face ID：challenge 在门禁页出现时预取，点击后立即调用。
+let loginOptions = null;
+async function preparePasskey() {
+  loginOptions = null;
+  let options = null;
+  if (await passkeyReady) {
+    try { options = await request('/passkey/login/options','POST',{}); } catch { /* 显示不了就只留密码 */ }
+  }
+  loginOptions = options?.enabled ? options : null;
+  for (const button of document.querySelectorAll('[data-passkey]')) button.closest('.btn-row').style.display = loginOptions ? '' : 'none';
+}
+async function doPasskey(button,errEl) {
+  const options = loginOptions?.options;
+  loginOptions = null;
+  errEl.textContent = '';
+  if (!options) { preparePasskey(); errEl.textContent = 'Face ID 还没准备好，请再点一次'; return; }
+  button.disabled = true;
+  try {
+    let credential;
+    try {
+      credential = await navigator.credentials.get({ publicKey:{ ...options,challenge:fromB64u(options.challenge),
+        allowCredentials:credentialList(options.allowCredentials),extensions:{ prf:{ eval:{ first:PRF_INPUT } } } } });
+    } catch (e) { throw new Error(webauthnError(e)); }
+    const result = await request('/passkey/login','POST',{ response:credentialJSON(credential) });
+    try { await unlockWithPrf(prfOf(credential),result.wrappedKey); }
+    catch {
+      await enterMasterPasswordGate();
+      document.getElementById('lockErr').textContent = 'Face ID 已登录，但没能解开保险库，请输入主密码';
+      return;
+    }
+    await openVault();
+  } catch (e) { errEl.textContent = e.message; preparePasskey(); }
+  finally { button.disabled = false; }
+}
+document.getElementById('pkLogin').onclick = e => doPasskey(e.currentTarget,document.getElementById('loginErr'));
+document.getElementById('pkUnlock').onclick = e => doPasskey(e.currentTarget,document.getElementById('lockErr'));
+
+// 开启：验证主密码（拿到原始 key）→ create() → 必要时再 get() 取 PRF → 包裹后登记
+let enrolling = null;
+const deviceLabel = () => [['iPhone',/iPhone/],['iPad',/iPad/],['Mac',/Macintosh/],['Android',/Android/],['Windows',/Windows/]]
+  .find(([,re]) => re.test(navigator.userAgent))?.[0] || '浏览器';
+async function enrollStep() {
+  const button = document.getElementById('pkStep'), msg = document.getElementById('pkMsg');
+  const stage = !enrolling ? enrollVerify : !enrolling.credential ? enrollCreate : enrollPrf;
+  button.disabled = true;
+  try {
+    const next = await stage();
+    if (next) { button.textContent = next.button; msg.textContent = next.msg; }
+  } catch (e) {
+    if (enrolling?.credential) PublicKeyCredential.signalUnknownCredential?.({ rpId:enrolling.options.rp.id,credentialId:enrolling.credential.id })?.catch(() => {});
+    enrolling = null;
+    button.textContent = '验证主密码'; msg.textContent = e.message;
+  } finally { button.disabled = false; }
+}
+async function enrollVerify() {
+  if (!window.PublicKeyCredential) throw new Error('这个浏览器不支持通行密钥');
+  const pw = document.getElementById('pkMpw').value;
+  if (!pw) throw new Error('请输入当前主密码');
+  const ctx = context();
+  const raw = await deriveRaw(pw,unb64(ctx.salt));
+  let ok = false;
+  try { ok = await decryptWith(await importVaultKey(raw),state.vault.canary) === CANARY_PLAIN; } catch {}
+  if (!ok) throw new Error('主密码错误');
+  const options = await api('/passkey/register/options','POST',{});
+  if (!stillCurrent(ctx)) throw new Error('已锁定，请重新操作');
+  enrolling = { raw,salt:ctx.salt,options };
+  document.getElementById('pkMpw').value = '';
+  return { button:'在本设备开启 Face ID',msg:(await passkeyReady) ? '主密码正确，点按钮完成 Face ID 验证。'
+    : '主密码正确。这台设备似乎还没设置通行密钥管理器，点按钮后按系统提示设置（iOS：设置 → 通用 → 自动填充与密码）。' };
+}
+async function enrollCreate() {
+  const o = enrolling.options;
+  try {
+    enrolling.credential = await navigator.credentials.create({ publicKey:{ ...o,challenge:fromB64u(o.challenge),
+      user:{ ...o.user,id:fromB64u(o.user.id) },excludeCredentials:credentialList(o.excludeCredentials),
+      extensions:{ prf:{ eval:{ first:PRF_INPUT } } } } });
+  } catch (e) { throw new Error(webauthnError(e)); }
+  const prf = prfOf(enrolling.credential);
+  if (prf) return finishEnroll(prf);
+  // 部分平台创建时不返回 PRF 结果，需要再验证一次；iOS 要求这次也由点击触发
+  return { button:'完成设置（再验证一次）',msg:'还差一步：再做一次 Face ID 验证。' };
+}
+async function enrollPrf() {
+  let assertion;
+  try {
+    assertion = await navigator.credentials.get({ publicKey:{ challenge:crypto.getRandomValues(new Uint8Array(32)),rpId:enrolling.options.rp.id,
+      allowCredentials:[{ type:'public-key',id:enrolling.credential.rawId }],userVerification:'required',
+      extensions:{ prf:{ eval:{ first:PRF_INPUT } } } } });
+  } catch (e) { throw new Error(webauthnError(e)); }
+  const prf = prfOf(assertion);
+  if (!prf) throw new Error('这个浏览器不支持用 Face ID 解开保险库（iOS 需要 18.4 以上）');
+  return finishEnroll(prf);
+}
+async function finishEnroll(prf) {
+  const { raw,salt,credential } = enrolling;
+  const wrappedKey = await encryptWith(await prfWrapKey(prf),b64(raw));
+  await api('/passkey/register','POST',{ response:credentialJSON(credential),wrappedKey,label:deviceLabel(),expectedSalt:salt });
+  enrolling = null;
+  toast('Face ID 已开启');
+  refreshPasskeys();
+  return { button:'验证主密码',msg:'已开启。下次在登录页或锁屏页点「Face ID 解锁」。' };
+}
+async function refreshPasskeys() {
+  const box = document.getElementById('pkList');
+  if (!box) return;
+  let rows;
+  try { rows = await api('/passkeys'); } catch (e) { box.textContent = e.message; return; }
+  const when = t => t ? new Date(t).toLocaleString('zh-CN',{ hour12:false }) : '未使用';
+  box.innerHTML = rows.length ? rows.map(r => `<div class="mrow"><span class="mname">${esc(r.label)} · 最近使用 ${esc(when(r.last_used_at))}</span>
+    <button class="mini ghost" data-del-pk="${esc(r.id)}" aria-label="删除 Face ID">删除</button></div>`).join('')
+    : '<div class="hint">还没有设备开启。</div>';
+  box.querySelectorAll('[data-del-pk]').forEach(b => b.onclick = async () => {
+    if (!confirm('删除后这台设备不能再用 Face ID 解锁。钥匙串里的通行密钥需要到「密码」App 手动删除。继续？')) return;
+    try { await api('/passkeys/'+encodeURIComponent(b.dataset.delPk),'DELETE',{}); } catch (e) { return toast(e.message); }
+    toast('已删除'); refreshPasskeys();
+  });
+}
+
+// 页面没被系统杀掉时，离开超过 5 分钟回来就锁。只在回来时判断：iOS 挂起页面后计时器不可靠
+const IDLE_LOCK_MS = 5 * 60 * 1000;
+let hiddenAt = 0;
+const leave = () => { hiddenAt ||= Date.now(); };
+function back() {
+  if (masterKey && hiddenAt && Date.now() - hiddenAt >= IDLE_LOCK_MS) lock();
+  hiddenAt = 0;
+}
+document.addEventListener('visibilitychange',() => document.hidden ? leave() : back());
+addEventListener('pagehide',leave);
+addEventListener('pageshow',back);
+
 // 服务端登录与主密码解锁是两个独立门禁。
 async function enterMasterPasswordGate() {
   clearSensitive();
   document.getElementById('login').style.display = 'none';
   document.getElementById('lock').style.display = 'flex';
+  preparePasskey();
   await updateLockUI();
   document.getElementById('mpw').focus();
 }
 function showLogin() {
   document.getElementById('lock').style.display = 'none';
   document.getElementById('login').style.display = 'flex';
+  preparePasskey();
   document.getElementById('loginEmail').focus();
 }
 const loginBtn = document.getElementById('loginBtn');

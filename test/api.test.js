@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { once } from 'node:events';
 import { request as httpRequest } from 'node:http';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { openStore } from '../server/store.js';
 import { createApp } from '../server/app.js';
 import { setAdmin, equal } from '../server/auth.js';
@@ -157,7 +160,7 @@ test('empty-vault rotation and racing initialization',async t=>{
 
 test('devices CRUD, account device links, schema v2 and foreign keys',async t=>{
   const f=await fixture(t);await f.login();await f.initialize();
-  assert.equal(f.store.db.pragma('user_version',{simple:true}),2);
+  assert.equal(f.store.db.pragma('user_version',{simple:true}),3);
   const initialSnap=f.store.snapshot();
   assert.ok(Array.isArray(initialSnap.devices));assert.equal(initialSnap.devices.length,0);
   const addDev1=await f.change('/api/devices','POST',{name:'MacBook Pro',sort:1});
@@ -205,4 +208,57 @@ test('devices CRUD, account device links, schema v2 and foreign keys',async t=>{
   assert.equal(f.store.snapshot().devices.length,0);
   assert.equal(f.store.db.pragma('integrity_check',{simple:true}),'ok');
   assert.equal(f.store.db.pragma('foreign_key_check').length,0);
+});
+
+test('passkey boundaries: options gating, auth, revocation on rotate/reset, no secrets in listings',async t=>{
+  const f=await fixture(t,{loginLimit:3});
+  const insertPasskey=(id,wrapped)=>f.store.db.prepare('INSERT INTO passkeys VALUES (?,?,?,?,?,?,NULL)').run(id,'AQID',0,wrapped,'iPhone',new Date().toISOString());
+  assert.deepEqual((await f.call('/api/passkey/login/options','POST',{})).data,{enabled:false});
+  assert.equal((await f.call('/api/passkey/login/options','POST',{},{Origin:'https://evil.test'})).status,403);
+  assert.equal((await f.call('/api/passkey/register/options','POST',{})).status,401);
+  assert.equal((await f.call('/api/passkeys')).status,401);
+  await f.login();const {key,salt}=await f.initialize();
+  const reg=await f.call('/api/passkey/register/options','POST',{});
+  assert.equal(reg.status,200);assert.equal(reg.data.rp.id,'account.test');
+  assert.deepEqual(reg.data.authenticatorSelection,{authenticatorAttachment:'platform',residentKey:'required',requireResidentKey:true,userVerification:'required'});
+  const forged={id:'AAAA',rawId:'AAAA',type:'public-key',response:{clientDataJSON:'e30',attestationObject:'oA'},clientExtensionResults:{}};
+  const wrapped=await encryptWith(key,'not-a-real-key');
+  assert.equal((await f.call('/api/passkey/register','POST',{response:forged,wrappedKey:wrapped,label:'iPhone',expectedSalt:salt})).status,400);
+  assert.equal((await f.call('/api/passkey/register','POST',{response:forged,wrappedKey:'plaintext',label:'iPhone',expectedSalt:salt})).status,400);
+  assert.equal(f.store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
+  insertPasskey('cred-one',wrapped);
+  const opts=await f.call('/api/passkey/login/options','POST',{});
+  assert.equal(opts.data.enabled,true);assert.equal(opts.data.options.rpId,'account.test');
+  assert.equal(opts.data.options.userVerification,'required');assert.deepEqual(opts.data.options.allowCredentials.map(c=>c.id),['cred-one']);
+  const assertion=id=>({response:{id,rawId:id,type:'public-key',response:{clientDataJSON:'e30',authenticatorData:'AA',signature:'AA'},clientExtensionResults:{}}});
+  assert.equal((await f.call('/api/passkey/login','POST',assertion('unknown'))).status,401);
+  assert.equal((await f.call('/api/passkey/login','POST',assertion('cred-one'))).status,401);
+  assert.equal((await f.call('/api/passkey/login','POST',{response:{id:'cred-one'}})).status,400);
+  assert.equal((await f.call('/api/passkey/login','POST',assertion('cred-one'))).status,429);
+  const listing=await f.call('/api/passkeys');
+  assert.deepEqual(Object.keys(listing.data[0]).sort(),['created_at','id','label','last_used_at']);
+  assert.doesNotMatch(JSON.stringify((await f.call('/api/state')).data),/cred-one|passkey/);
+  assert.equal((await f.call('/api/passkeys/missing','DELETE',{})).status,404);
+  assert.equal((await f.call('/api/passkeys/cred-one','DELETE',{})).status,200);
+  insertPasskey('cred-two',wrapped);
+  const newSalt=b64(randomBytes(16)),newKey=await deriveKey('Test-vault-new-password',unb64(newSalt));
+  assert.equal((await f.change('/api/vault/rotate','POST',{salt:newSalt,canary:await encryptWith(newKey,CANARY_PLAIN),updates:[]})).status,200);
+  assert.equal(f.store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
+  insertPasskey('cred-three',wrapped);
+  await setAdmin(f.store.db,'admin@example.test',password,true);
+  assert.equal(f.store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
+});
+
+test('schema v2 database migrates to v3 without touching existing rows',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'account-migrate-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const file=join(dir,'account.db');
+  let store=openStore(file);
+  const before=store.snapshot();
+  store.db.exec('DROP TABLE passkeys; PRAGMA user_version=2;');store.db.close();
+  store=openStore(file);
+  assert.equal(store.db.pragma('user_version',{simple:true}),3);
+  assert.deepEqual(store.snapshot(),before);
+  assert.equal(store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
+  store.db.exec('PRAGMA user_version=4;');store.db.close();
+  assert.throws(()=>openStore(file),/newer than this server/);
 });

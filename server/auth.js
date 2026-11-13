@@ -20,6 +20,7 @@ export async function setAdmin(db, email, password, reset = false) {
     if (!exists && reset) throw new Error('管理员尚未创建');
     db.prepare('INSERT INTO admins VALUES (1,?,?) ON CONFLICT(id) DO UPDATE SET email=excluded.email,password_hash=excluded.password_hash').run(email,passwordHash);
     db.prepare('DELETE FROM sessions').run();
+    db.prepare('DELETE FROM passkeys').run();
   })();
 }
 export async function createAuth(db, { production, sessionSeconds = 43200, loginLimit = 10 }) {
@@ -44,7 +45,8 @@ export async function createAuth(db, { production, sessionSeconds = 43200, login
     if (value) db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(value));
     if (clearCookie) cookie(res,'',0);
   }
-  async function login(req,res,data) {
+  /** 密码登录与 passkey 登录共用的限流：返回成功后调用的清零函数 */
+  function throttle(req,res) {
     const time = Date.now();
     for (const [key,bucket] of attempts) if (bucket.until <= time) attempts.delete(key);
     const key = req.ip;
@@ -55,17 +57,13 @@ export async function createAuth(db, { production, sessionSeconds = 43200, login
     }
     bucket.count++;
     attempts.set(key,bucket);
-    const admin = db.prepare('SELECT email,password_hash FROM admins WHERE id=1').get();
-    hashing++;
-    let valid;
-    try { valid = await argon2.verify(admin?.password_hash || fakeHash,data.password); }
-    finally { hashing--; }
-    if (!valid || data.email !== admin?.email) throw new HttpError(401,'邮箱或密码错误');
-    attempts.delete(key);
-    const value = random(), csrf = random(), expiresAt = time+sessionSeconds*1000;
+    return () => attempts.delete(key);
+  }
+  /** 发新会话；guard 在同一事务里复核凭据仍然有效 */
+  function issue(req,res,guard) {
+    const time = Date.now(), value = random(), csrf = random(), expiresAt = time+sessionSeconds*1000;
     db.transaction(() => {
-      const current = db.prepare('SELECT email,password_hash FROM admins WHERE id=1').get();
-      if (current?.password_hash !== admin.password_hash || current.email !== admin.email) throw new HttpError(401,'登录信息已变更，请重试');
+      guard();
       revoke(req,res,false);
       db.prepare('DELETE FROM sessions WHERE expires_at<=?').run(time);
       db.prepare('DELETE FROM sessions WHERE token_hash IN (SELECT token_hash FROM sessions ORDER BY expires_at DESC LIMIT -1 OFFSET 19)').run();
@@ -74,5 +72,19 @@ export async function createAuth(db, { production, sessionSeconds = 43200, login
     cookie(res,value,sessionSeconds*1000);
     return { authenticated:true, csrf, expiresAt };
   }
-  return { session, login, revoke };
+  async function login(req,res,data) {
+    const passed = throttle(req,res);
+    const admin = db.prepare('SELECT email,password_hash FROM admins WHERE id=1').get();
+    hashing++;
+    let valid;
+    try { valid = await argon2.verify(admin?.password_hash || fakeHash,data.password); }
+    finally { hashing--; }
+    if (!valid || data.email !== admin?.email) throw new HttpError(401,'邮箱或密码错误');
+    passed();
+    return issue(req,res,() => {
+      const current = db.prepare('SELECT email,password_hash FROM admins WHERE id=1').get();
+      if (current?.password_hash !== admin.password_hash || current.email !== admin.email) throw new HttpError(401,'登录信息已变更，请重试');
+    });
+  }
+  return { session, login, revoke, throttle, issue };
 }

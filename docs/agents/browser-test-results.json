@@ -55,7 +55,7 @@
         "testMatch": "browser.spec.js",
         "timeout": 60000,
         "use": {
-          "baseURL": "http://127.0.0.1:3107",
+          "baseURL": "http://localhost:3107",
           "headless": true,
           "actionTimeout": 10000,
           "screenshot": "only-on-failure",
@@ -119,12 +119,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 9160,
+                  "duration": 8340,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-11T02:09:32.434Z",
+                  "startTime": "2026-11-13T07:16:35.363Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -153,12 +153,12 @@
                   "workerIndex": 0,
                   "parallelIndex": 0,
                   "status": "passed",
-                  "duration": 2564,
+                  "duration": 2601,
                   "errors": [],
                   "stdout": [],
                   "stderr": [],
                   "retry": 0,
-                  "startTime": "2026-11-11T02:09:41.865Z",
+                  "startTime": "2026-11-13T07:16:43.978Z",
                   "annotations": [],
                   "attachments": []
                 }
@@ -170,15 +170,49 @@
           "file": "browser.spec.js",
           "line": 134,
           "column": 1
+        },
+        {
+          "title": "Face ID passkey: one gesture logs in and unlocks; replay, idle lock, rotation and no-PRF fallback",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 60000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 6096,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-11-13T07:16:46.584Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "254a68b5fae918765be2-ae8fc3a05bc9a16aceaa",
+          "file": "browser.spec.js",
+          "line": 172,
+          "column": 1
         }
       ]
     }
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-11-11T02:09:31.227Z",
-    "duration": 13262.334,
-    "expected": 2,
+    "startTime": "2026-11-13T07:16:34.157Z",
+    "duration": 18584.210000000003,
+    "expected": 3,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

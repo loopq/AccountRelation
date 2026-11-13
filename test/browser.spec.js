@@ -143,3 +143,89 @@ test('legacy service worker and sensitive cache removed before new API calls',as
   await expect.poll(()=>page.evaluate(async()=>(await caches.keys()).includes('ag-shell-v1'))).toBe(false);
   const session=await page.evaluate(async()=>{const r=await fetch('/api/session');return r.json();});expect(session.authenticated).toBe(false);
 });
+
+async function virtualAuthenticator(page,hasPrf) {
+  const cdp=await page.context().newCDPSession(page);await cdp.send('WebAuthn.enable');
+  const {authenticatorId}=await cdp.send('WebAuthn.addVirtualAuthenticator',{options:{protocol:'ctap2',ctap2Version:'ctap2_1',transport:'internal',
+    hasResidentKey:true,hasUserVerification:true,isUserVerified:true,hasPrf,automaticPresenceSimulation:true}});
+  return ()=>cdp.send('WebAuthn.removeVirtualAuthenticator',{authenticatorId});
+}
+async function enroll(page,pw) {
+  await page.locator('#settings').click();await page.locator('#pkMpw').fill(pw);await page.locator('#pkStep').click();
+  await expect(page.locator('#pkStep')).toHaveText('在本设备开启 Face ID');await page.locator('#pkStep').click();
+  await expect(page.locator('#pkStep')).toHaveText(/验证主密码|完成设置/);
+  const label=await page.locator('#pkStep').textContent();
+  if(label!=='验证主密码') await page.locator('#pkStep').click();
+  return label;
+}
+// 回到前台前把时钟拨快 ms，模拟离开一段时间
+async function away(page,ms) {
+  await page.evaluate(ms=>{
+    const real=Date.now;
+    Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));
+    Date.now=()=>real()+ms;
+    Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'));
+    Date.now=real;
+  },ms);
+}
+
+test('Face ID passkey: one gesture logs in and unlocks; replay, idle lock, rotation and no-PRF fallback',async({page})=>{
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+  const logins=[];page.on('request',r=>{if(r.url().endsWith('/api/passkey/login')) logins.push(r.postData());});
+  let removeAuthenticator=await virtualAuthenticator(page,true);
+  await login(page);await unlock(page,nextMaster);
+  await page.locator('#add').click();await page.locator('#f-platform').selectOption({label:'Gmail'});
+  await page.locator('#f-name').fill('passkey@example.test');await page.locator('#f-pw').fill('fake-passkey-secret-444');await page.locator('#f-save').click();
+  await expect(page.locator('#drawer')).not.toHaveClass(/open/);
+  await enroll(page,nextMaster);
+  await expect(page.locator('#toast')).toContainText('Face ID 已开启');await expect(page.locator('#pkList .mrow')).toHaveCount(1);
+  await page.locator('#sdrawerClose').click();
+  // 退出后：登录页一次 Face ID 直接进入已解锁列表
+  await page.locator('#logout').click();await expect(page.locator('#login')).toBeVisible();
+  await page.locator('#pkLogin').click();
+  await expect(page.locator('#login')).toBeHidden();await expect(page.locator('#lock')).toBeHidden();
+  await page.locator('.card:has-text("passkey@example.test") [data-edit]').click();await expect(page.locator('#f-pw')).toHaveValue('fake-passkey-secret-444');
+  await page.locator('#drawerClose').click();
+  expect(logins).toHaveLength(1);expect(JSON.parse(logins[0]).response.clientExtensionResults).toEqual({});
+  // 重放同一份断言：challenge 已消费
+  expect(await page.evaluate(async body=>(await fetch('/api/passkey/login',{method:'POST',headers:{'Content-Type':'application/json'},body})).status,logins[0])).toBe(401);
+  // 重载后会话还在：锁屏页同样一次 Face ID
+  await page.reload();await expect(page.locator('#lock')).toBeVisible();
+  await page.locator('#pkUnlock').click();await expect(page.locator('#lock')).toBeHidden();
+  await expect(page.locator('.card:has-text("passkey@example.test")')).toHaveCount(1);
+  // 回访锁：离开 4 分钟不锁，离开 5 分钟以上锁
+  await away(page,4*60_000);await expect(page.locator('#lock')).toBeHidden();
+  await away(page,5*60_000+1000);await expect(page.locator('#lock')).toBeVisible();await expect(page.locator('#pkUnlock')).toBeVisible();
+  await page.locator('#pkUnlock').click();await expect(page.locator('#lock')).toBeHidden();
+  // 改主密码：所有 Face ID 作废，按钮不再出现，新主密码照常解锁
+  const rotated='Pk-rotated-918';
+  await page.locator('#settings').click();
+  await page.locator('#curMpw').fill(nextMaster);await page.locator('#newMpw1').fill(rotated);await page.locator('#newMpw2').fill(rotated);await page.locator('#changeMpw').click();
+  await expect(page.locator('#toast')).toContainText('Face ID 需重新开启');
+  await page.locator('#lockNow').click();await expect(page.locator('#lock')).toBeVisible();await expect(page.locator('#pkUnlock')).toBeHidden();
+  await unlock(page,rotated);
+  await page.locator('#logout').click();await expect(page.locator('#login')).toBeVisible();await expect(page.locator('#pkLogin')).toBeHidden();
+  // 不支持 PRF 的验证器：开启失败并说明原因，不登记任何东西
+  await removeAuthenticator();removeAuthenticator=await virtualAuthenticator(page,false);
+  await login(page);await unlock(page,rotated);
+  await enroll(page,rotated);
+  await expect(page.locator('#pkMsg')).toContainText('不支持');await expect(page.locator('#pkList')).toContainText('还没有设备开启');
+  await page.locator('#sdrawerClose').click();await page.locator('#logout').click();await expect(page.locator('#login')).toBeVisible();
+  // 创建时不返回 PRF 结果（iOS 可能如此）：再验证一次拿 PRF，之后 Face ID 照常解锁
+  await removeAuthenticator();await virtualAuthenticator(page,true);
+  await page.addInitScript(()=>{
+    const create=navigator.credentials.create.bind(navigator.credentials);
+    navigator.credentials.create=async options=>{
+      const credential=await create(options),results=credential.getClientExtensionResults();
+      credential.getClientExtensionResults=()=>({...results,prf:{enabled:true}});
+      return credential;
+    };
+  });
+  await login(page);await unlock(page,rotated);
+  expect(await enroll(page,rotated)).toBe('完成设置（再验证一次）');
+  await expect(page.locator('#toast')).toContainText('Face ID 已开启');await expect(page.locator('#pkList .mrow')).toHaveCount(1);
+  await page.locator('#sdrawerClose').click();await page.locator('#logout').click();
+  await page.locator('#pkLogin').click();await expect(page.locator('#login')).toBeHidden();await expect(page.locator('#lock')).toBeHidden();
+  await expect(page.locator('.card:has-text("passkey@example.test")')).toHaveCount(1);
+  expect(errors).toEqual([]);
+});

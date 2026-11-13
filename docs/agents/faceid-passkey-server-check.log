@@ -1,0 +1,6 @@
+RELEASE_MARKER 16ee2c030ea550dae2f6
+PREVIOUS_ENV APP_IMAGE=account-relation:c9c611f1ff5831bd6a01
+CONTAINER account-relation:16ee2c030ea550dae2f6 Up 2 minutes (healthy)
+LATEST_PREDEPLOY_BACKUP predeploy-20261113T064805Z.db
+APP_LOG_ERRORS 0
+app-1  | account-relation listening on 3000

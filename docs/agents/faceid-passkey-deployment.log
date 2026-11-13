@@ -1,0 +1,91 @@
+source.tar.gz: OK
+RELEASE_MANIFEST_VERIFIED 45338a2cbb19a62ba010fdeead9a29a0d67e8a7f
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 244B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 184.61kB 0.0s done
+#4 DONE 0.0s
+
+#5 [dependencies 1/5] FROM docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#5 resolve docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 0.0s done
+#5 DONE 0.0s
+
+#6 [dependencies 2/5] WORKDIR /app
+#6 CACHED
+
+#7 [dependencies 3/5] RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [dependencies 4/5] COPY package.json package-lock.json ./
+#8 DONE 0.0s
+
+#9 [dependencies 5/5] RUN npm ci --omit=dev && npm cache clean --force
+#9 10.37
+#9 10.37 added 104 packages, and audited 105 packages in 8s
+#9 10.37
+#9 10.37 31 packages are looking for funding
+#9 10.37   run `npm fund` for details
+#9 10.37
+#9 10.37 found 0 vulnerabilities
+#9 10.37 npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+#9 10.37 npm warn install-scripts   argon2@0.45.2 (install: cross-env ZERO_AR_DATE=1 node-gyp-build)
+#9 10.37 npm warn install-scripts   better-sqlite3@13.0.3 (install: node-gyp rebuild)
+#9 10.37 npm warn install-scripts
+#9 10.37 npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.
+#9 10.37 npm notice
+#9 10.37 npm notice New major version of npm available! 11.19.1 -> 12.2.2
+#9 10.37 npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+#9 10.37 npm notice To update run: npm install -g npm@12.2.2
+#9 10.37 npm notice
+#9 10.54 npm warn using --force Recommended protections disabled.
+#9 DONE 10.9s
+
+#6 [dependencies 2/5] WORKDIR /app
+#6 CACHED
+
+#10 [stage-1 3/7] COPY --from=dependencies /app/node_modules ./node_modules
+#10 DONE 0.6s
+
+#11 [stage-1 4/7] COPY package.json ./
+#11 DONE 0.1s
+
+#12 [stage-1 5/7] COPY server ./server
+#12 DONE 0.0s
+
+#13 [stage-1 6/7] COPY web/index.html web/app.js web/api-client.js web/crypto.js web/theme.js web/sw.js web/manifest.webmanifest ./web/
+#13 DONE 0.1s
+
+#14 [stage-1 7/7] COPY web/icons ./web/icons
+#14 DONE 0.0s
+
+#15 exporting to image
+#15 exporting layers
+#15 exporting layers 2.3s done
+#15 exporting manifest sha256:1bd5a1353944be574ef46f885145d90e3eaab3eb547c95492763e6279f9df914 0.0s done
+#15 exporting config sha256:441ede983188adcdc4379e484edabcd9c032ebc5ae2e3c45e6a8c5053529ca4f 0.0s done
+#15 exporting attestation manifest sha256:d38f6fafc4c760b913ef8d88f988e1cebe6702e77e05735bbe8925ff9b3ea87b 0.0s done
+#15 exporting manifest list sha256:3149ff26f3626de55d9b58e1a313b0de5bc55c6b6e849eaa74470bf5bcf07c92 0.0s done
+#15 naming to docker.io/library/account-relation:16ee2c030ea550dae2f6 done
+#15 unpacking to docker.io/library/account-relation:16ee2c030ea550dae2f6
+#15 unpacking to docker.io/library/account-relation:16ee2c030ea550dae2f6 0.9s done
+#15 DONE 3.3s
+sha256:3149ff26f3626de55d9b58e1a313b0de5bc55c6b6e849eaa74470bf5bcf07c92 amd64
+Consistent SQLite backup verified.
+ Container account-relation-app-1 Recreate
+ Container account-relation-app-1 Recreated
+ Container account-relation-app-1 Starting
+ Container account-relation-app-1 Started
+ Container account-relation-app-1 Waiting
+ Container account-relation-app-1 Healthy
+DEPLOYED_RELEASE=16ee2c030ea550dae2f6

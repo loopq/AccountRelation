@@ -1,0 +1,68 @@
+source.tar.gz: OK
+RELEASE_MANIFEST_VERIFIED 45338a2cbb19a62ba010fdeead9a29a0d67e8a7f
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 244B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 59.48kB done
+#4 DONE 0.0s
+
+#5 [dependencies 1/5] FROM docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#5 resolve docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 0.0s done
+#5 DONE 0.0s
+
+#6 [dependencies 2/5] WORKDIR /app
+#6 CACHED
+
+#7 [dependencies 4/5] COPY package.json package-lock.json ./
+#7 CACHED
+
+#8 [dependencies 3/5] RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+#8 CACHED
+
+#9 [stage-1 3/7] COPY --from=dependencies /app/node_modules ./node_modules
+#9 CACHED
+
+#10 [dependencies 5/5] RUN npm ci --omit=dev && npm cache clean --force
+#10 CACHED
+
+#11 [stage-1 4/7] COPY package.json ./
+#11 CACHED
+
+#12 [stage-1 5/7] COPY server ./server
+#12 DONE 0.0s
+
+#13 [stage-1 6/7] COPY web/index.html web/app.js web/api-client.js web/crypto.js web/theme.js web/sw.js web/manifest.webmanifest ./web/
+#13 DONE 0.1s
+
+#14 [stage-1 7/7] COPY web/icons ./web/icons
+#14 DONE 0.0s
+
+#15 exporting to image
+#15 exporting layers 0.1s done
+#15 exporting manifest sha256:05af97a6ca2bc2c5def854ba764de256a61acb4ac8c3d3c9d0c4d56144f224e0 0.0s done
+#15 exporting config sha256:2c0ba4cca49431834a50b010672636f369878e80e8fcabb396b8f1f095337202 0.0s done
+#15 exporting attestation manifest sha256:b97ff4983ac0fb6acd5d844a33985f57022a4d1f2e99d57aa7efb142be4da663 0.0s done
+#15 exporting manifest list sha256:471bb5fe0c2dfc2c0f27fd3cc7e82fc004a3eb2d797b0500289c93f21c36454c 0.0s done
+#15 naming to docker.io/library/account-relation:a593a252f55e01c1e4bd done
+#15 unpacking to docker.io/library/account-relation:a593a252f55e01c1e4bd 0.1s done
+#15 DONE 0.2s
+sha256:471bb5fe0c2dfc2c0f27fd3cc7e82fc004a3eb2d797b0500289c93f21c36454c amd64
+Consistent SQLite backup verified.
+ Container account-relation-app-1 Recreate
+ Container account-relation-app-1 Recreated
+ Container account-relation-app-1 Starting
+ Container account-relation-app-1 Started
+ Container account-relation-app-1 Waiting
+ Container account-relation-app-1 Healthy
+DEPLOYED_RELEASE=a593a252f55e01c1e4bd
