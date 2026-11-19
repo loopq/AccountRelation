@@ -33,8 +33,8 @@ try {
  await page.locator('#logout').evaluate(button=>button.click());
  await page.locator('#login').waitFor({state:'visible'});
  await page.waitForFunction(async()=>{const r=await fetch('/api/state',{cache:'no-store'});return r.status===401;});
- await page.screenshot({path:'docs/agents/account-relation-public-login.png'});
- writeFileSync('docs/agents/public-browser-verification.json',JSON.stringify({url:page.url(),forcedResolver:forced,tls,login:true,secureCookie:true,logoutRevoked:true,productionVaultInitialized:false,productionAccounts:0},null,2));
+ await page.screenshot({path:'docs/deploy/account-relation-public-login.png'});
+ writeFileSync('docs/deploy/public-browser-verification.json',JSON.stringify({url:page.url(),forcedResolver:forced,tls,login:true,secureCookie:true,logoutRevoked:true,productionVaultInitialized:false,productionAccounts:0},null,2));
  console.log('PUBLIC_BROWSER_TLS_LOGIN_LOGOUT_PASS; PRODUCTION_VAULT_EMPTY');
 } catch(error) {
  console.error('VERIFICATION_FAILED',String(error.message).replaceAll(secret,'[REDACTED]'));
@@ -43,7 +43,7 @@ try {
    const e=document.getElementById(id);return [id,e?{display:getComputedStyle(e).display,text:['lockLead','loginErr','lockErr'].includes(id)?e.textContent:undefined}:null];
   }))).catch(()=>null));
   await page.evaluate(()=>{const e=document.getElementById('loginPw');if(e)e.value='';}).catch(()=>{});
-  await page.screenshot({path:'docs/agents/public-browser-failure.png'}).catch(()=>{});
+  await page.screenshot({path:'docs/deploy/public-browser-failure.png'}).catch(()=>{});
  }
  process.exitCode=1;
 } finally {await browser.close();}

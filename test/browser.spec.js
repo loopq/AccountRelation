@@ -160,7 +160,7 @@ test('full user workflow and no plaintext in API/storage; desktop and mobile',as
   await expect(page.locator('#col-email .dev-filter')).toBeVisible();
   await expect(page.locator('#col-email .claude-stats')).toBeVisible();
   await page.locator('[data-tab="ai"]').click();await expect(page.locator('#col-ai .card')).toHaveCount(1);
-  await page.screenshot({path:'docs/agents/account-relation-mobile-verification.png'});
+  await page.screenshot({path:'docs/deploy/account-relation-mobile-verification.png'});
   const stale=await context.newPage();await stale.goto('/');await unlock(stale,nextMaster);
   await stale.locator('#add').click();await stale.locator('#f-platform').selectOption({label:'Gmail'});
   await stale.locator('#f-name').fill('stale account');await stale.locator('#f-pw').fill('stale-secret');

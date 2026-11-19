@@ -2,9 +2,9 @@
 # 网页端源码、部署脚本与脱敏验收记录
 # ============================================
 
-# 仅提交用户授权的 docs/agents 脱敏审计副本
+# 仅提交用户授权的 docs/deploy 脱敏部署验收副本（plan / review 只留本地）
 /docs/*
-!/docs/agents/
+!/docs/deploy/
 账号图谱-预调研交接.md
 CLAUDE.md
 
@@ -48,7 +48,7 @@ test-results/
 artifacts/
 
 # User-approved sanitized audit outputs
-!/docs/agents/*.log
+!/docs/deploy/*.log
 *.pem
 *.key
 *.p12

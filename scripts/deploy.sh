@@ -59,5 +59,5 @@ printf 'DEPLOYED_RELEASE=%s\n' "$release"
 REMOTE
 actual=$(ssh "${ssh_opts[@]}" tencent-seoul-admin 'sudo cat /etc/account-relation/current-release')
 [ "$actual" = "$release" ] || { echo 'Release marker mismatch' >&2; exit 1; }
-mkdir -p docs/agents
-printf '%s\n' "$release" >docs/agents/current-release.txt
+mkdir -p docs/deploy
+printf '%s\n' "$release" >docs/deploy/current-release.txt
