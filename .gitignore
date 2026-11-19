@@ -6,7 +6,7 @@
 /docs/*
 !/docs/deploy/
 账号图谱-预调研交接.md
-CLAUDE.md
+CLAUDE.local.md
 
 # 开发工具配置（含 Supabase project_ref）
 .mcp.json
