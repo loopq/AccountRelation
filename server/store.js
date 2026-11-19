@@ -5,7 +5,7 @@ import { dirname } from 'node:path';
 import { HttpError } from './validation.js';
 
 const accountColumns = ['category', 'platform_id', 'name', 'encrypted_password', 'encrypted_2fa',
-  'phone', 'twofa_enabled', 'country_id', 'register_email_id', 'subscribe_apple_id', 'note', 'recovery_email'];
+  'phone', 'twofa_enabled', 'passkey_enabled', 'country_id', 'register_email_id', 'subscribe_apple_id', 'note', 'recovery_email'];
 const now = () => new Date().toISOString();
 
 export function openStore(filename) {
@@ -17,7 +17,7 @@ export function openStore(filename) {
   db.pragma('busy_timeout = 5000');
   db.pragma('synchronous = FULL');
   const version = db.pragma('user_version', { simple: true });
-  if (version > 3) throw new Error('Database schema is newer than this server');
+  if (version > 4) throw new Error('Database schema is newer than this server');
   if (version === 0) db.transaction(() => {
     db.exec(`
       CREATE TABLE platforms (id TEXT PRIMARY KEY, category TEXT NOT NULL CHECK(category IN ('email','apple','ai')),
@@ -69,6 +69,12 @@ export function openStore(filename) {
       PRAGMA user_version=3;
     `);
   })();
+  if (version < 4) db.transaction(() => {
+    db.exec(`
+      ALTER TABLE accounts ADD COLUMN passkey_enabled INTEGER NOT NULL DEFAULT 0 CHECK(passkey_enabled IN (0,1));
+      PRAGMA user_version=4;
+    `);
+  })();
 
   const revision = () => db.prepare('SELECT revision FROM data_version WHERE id=1').get().revision;
   const meta = () => db.prepare('SELECT salt,canary,created_at FROM vault_meta WHERE id=1').get() || null;
@@ -77,7 +83,8 @@ export function openStore(filename) {
     return {
       revision: revision(), vault: meta(),
       accounts: db.prepare('SELECT * FROM accounts ORDER BY created_at,id').all().map(a => ({
-        ...a, twofa_enabled: !!a.twofa_enabled, device_ids: (links.get(a.id) || []).map(r => r.device_id),
+        ...a, twofa_enabled: !!a.twofa_enabled, passkey_enabled: !!a.passkey_enabled,
+        device_ids: (links.get(a.id) || []).map(r => r.device_id),
       })),
       platforms: db.prepare('SELECT * FROM platforms ORDER BY sort,id').all(),
       countries: db.prepare('SELECT * FROM countries ORDER BY sort,id').all(),
@@ -120,7 +127,11 @@ export function openStore(filename) {
     const { device_ids, ...accountData } = data;
     const row = { ...previous, ...accountData };
     validateRelations(row, id);
-    const values = accountColumns.map(k => k === 'twofa_enabled' ? Number(!!row[k]) : row[k] ?? null);
+    if (row.category !== 'email') {
+      if (accountData.passkey_enabled) throw new HttpError(400, '只有 Email 账号可以设置通行密钥');
+      row.passkey_enabled = false;
+    }
+    const values = accountColumns.map(k => ['twofa_enabled', 'passkey_enabled'].includes(k) ? Number(!!row[k]) : row[k] ?? null);
     const timestamp = now();
     if (id) db.prepare(`UPDATE accounts SET ${accountColumns.map(k => `${k}=?`).join(',')},updated_at=? WHERE id=?`).run(...values,timestamp,id);
     else {

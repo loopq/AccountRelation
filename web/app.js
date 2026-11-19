@@ -225,6 +225,7 @@ function renderCard(a) {
   if (showCountryPhone2fa) {
     chips.push(countryTag(a.country_id));
     if (a.twofa_enabled) chips.push(`<span class="chip ok">${icon('i-check')}2FA</span>`);
+    if (a.category === 'email' && a.passkey_enabled) chips.push(`<span class="chip ok">${icon('i-check')}通行密钥</span>`);
   }
   // 键值行：[标签, HTML]
   const rows = [];
@@ -404,8 +405,8 @@ function openForm(a) {
         <label for="f-recovery">辅助邮箱</label>
         <input id="f-recovery" class="mono" value="${esc(a.recovery_email || '')}" placeholder="recovery@example.com" spellcheck="false">
         <div class="toggle-row">
-          <input type="checkbox" id="f-2fa" ${a.twofa_enabled ? 'checked' : ''}>
-          <label for="f-2fa">已开启 2FA 两步验证</label>
+          <label class="toggle-item"><input type="checkbox" id="f-2fa" ${a.twofa_enabled ? 'checked' : ''}> 已开启 2FA 两步验证</label>
+          <label class="toggle-item field-passkey"><input type="checkbox" id="f-passkey" ${a.passkey_enabled ? 'checked' : ''}> 已开启通行密钥</label>
         </div>
         <label for="f-2fakey">2FA 密钥 / TOTP 种子</label>
         <div class="pw-row">
@@ -441,6 +442,7 @@ function openForm(a) {
     const cat = p ? p.category : null;
     body.querySelector('.field-devices').classList.toggle('hidden', cat !== 'email');
     body.querySelector('.field-email-apple').classList.toggle('hidden', !(cat === 'email' || cat === 'apple'));
+    body.querySelector('.field-passkey').classList.toggle('hidden', cat !== 'email');
     body.querySelector('.field-register').classList.toggle('hidden', !(cat === 'apple' || cat === 'ai'));
     body.querySelector('.field-subscribe').classList.toggle('hidden', cat !== 'ai');
   };
@@ -496,6 +498,7 @@ async function saveAccount(a, isNew, ctx) {
   } else {
     row.phone = null; row.country_id = null; row.twofa_enabled = false; row.recovery_email = null;
   }
+  row.passkey_enabled = cat === 'email' ? body.querySelector('#f-passkey').checked : false;
   row.register_email_id = (cat === 'apple' || cat === 'ai') ? (body.querySelector('#f-register').value || null) : null;
   row.subscribe_apple_id = (cat === 'ai') ? (body.querySelector('#f-subscribe').value || null) : null;
 
@@ -644,7 +647,7 @@ function renderSettings() {
     </div>
     <div class="group">
       <div class="group-title">批量导入</div>
-      <textarea id="importJson" class="mono" placeholder='[{"platform":"Gmail","name":"x@gmail.com","password":"...","recovery_email":"...","twofa_secret":"...","phone":"...","twofa_enabled":true}]' style="min-height:96px" spellcheck="false"></textarea>
+      <textarea id="importJson" class="mono" placeholder='[{"platform":"Gmail","name":"x@gmail.com","password":"...","recovery_email":"...","twofa_secret":"...","phone":"...","twofa_enabled":true,"passkey_enabled":true}]' style="min-height:96px" spellcheck="false"></textarea>
       <div class="btn-row"><button id="importBtn">解析并导入</button></div>
       <div class="hint" id="importMsg">password 和 2FA 密钥在本地加密后入库。platform 必须是已有平台名。</div>
       <div class="hint">密码与 2FA 密钥已加密；账号名称、联系方式和备注作为元数据保存。</div>
@@ -775,7 +778,7 @@ async function doBatchImport() {
       const country = item.country ? state.countries.find(c => c.name === item.country) : null;
       if (item.country && !country) throw new Error('国家/地区不存在: '+item.country);
       rows.push({ category:plat.category,platform_id:plat.id,name:item.name,
-        phone:item.phone || null,twofa_enabled:!!item.twofa_enabled,recovery_email:item.recovery_email || null,
+        phone:item.phone || null,twofa_enabled:!!item.twofa_enabled,passkey_enabled:!!item.passkey_enabled,recovery_email:item.recovery_email || null,
         country_id:country?.id || null,note:item.note || null,
         encrypted_password:item.password ? await encryptWith(ctx.key,item.password) : null,
         encrypted_2fa:item.twofa_secret ? await encryptWith(ctx.key,item.twofa_secret) : null });

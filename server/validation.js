@@ -17,7 +17,7 @@ export const cipher = z.string().max(24000).refine(s => {
 export const account = z.strictObject({
   category, platform_id: uuid, name: z.string().trim().min(1).max(300),
   encrypted_password: cipher.nullable().optional(), encrypted_2fa: cipher.nullable().optional(),
-  phone: text(100), twofa_enabled: z.boolean().optional(), country_id: ref,
+  phone: text(100), twofa_enabled: z.boolean().optional(), passkey_enabled: z.boolean().optional(), country_id: ref,
   register_email_id: ref, subscribe_apple_id: ref, note: text(10000), recovery_email: text(320),
   device_ids: z.array(uuid).max(100).optional(),
 });

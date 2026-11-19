@@ -160,7 +160,7 @@ test('empty-vault rotation and racing initialization',async t=>{
 
 test('devices CRUD, account device links, schema v2 and foreign keys',async t=>{
   const f=await fixture(t);await f.login();await f.initialize();
-  assert.equal(f.store.db.pragma('user_version',{simple:true}),3);
+  assert.equal(f.store.db.pragma('user_version',{simple:true}),4);
   const initialSnap=f.store.snapshot();
   assert.ok(Array.isArray(initialSnap.devices));assert.equal(initialSnap.devices.length,0);
   const addDev1=await f.change('/api/devices','POST',{name:'MacBook Pro',sort:1});
@@ -210,6 +210,28 @@ test('devices CRUD, account device links, schema v2 and foreign keys',async t=>{
   assert.equal(f.store.db.pragma('foreign_key_check').length,0);
 });
 
+test('email account passkey flag: create, read, partial patch, reject non-email and clear on category change',async t=>{
+  const f=await fixture(t);await f.login();await f.initialize();
+  const snapshot=f.store.snapshot(),emailPlatform=snapshot.platforms.find(p=>p.category==='email'),applePlatform=snapshot.platforms.find(p=>p.category==='apple');
+  const create=await f.change('/api/accounts','POST',{category:'email',platform_id:emailPlatform.id,name:'passkey@example.test',twofa_enabled:true,passkey_enabled:true});
+  assert.equal(create.status,200);const id=create.data.result.id;
+  const read=(await f.call('/api/state')).data.accounts.find(a=>a.id===id);
+  assert.equal(read.passkey_enabled,true);assert.equal(read.twofa_enabled,true);
+  assert.equal((await f.change('/api/accounts/'+id,'PATCH',{name:'passkey-renamed@example.test'})).status,200);
+  assert.equal(f.store.snapshot().accounts.find(a=>a.id===id).passkey_enabled,true);
+  assert.equal((await f.change('/api/accounts/'+id,'PATCH',{passkey_enabled:false})).status,200);
+  assert.equal(f.store.snapshot().accounts.find(a=>a.id===id).passkey_enabled,false);
+  assert.equal((await f.change('/api/accounts/'+id,'PATCH',{passkey_enabled:true})).status,200);
+  assert.equal(f.store.snapshot().accounts.find(a=>a.id===id).passkey_enabled,true);
+  const beforeRejected=f.store.snapshot();
+  assert.equal((await f.change('/api/accounts','POST',{category:'apple',platform_id:applePlatform.id,name:'apple-passkey@example.test',passkey_enabled:true})).status,400);
+  assert.deepEqual(f.store.snapshot(),beforeRejected);
+  assert.equal((await f.change('/api/accounts/'+id,'PATCH',{category:'apple',platform_id:applePlatform.id})).status,200);
+  const changed=f.store.snapshot().accounts.find(a=>a.id===id);
+  assert.equal(changed.passkey_enabled,false);
+  assert.equal(f.store.db.prepare('SELECT passkey_enabled FROM accounts WHERE id=?').get(id).passkey_enabled,0);
+});
+
 test('passkey boundaries: options gating, auth, revocation on rotate/reset, no secrets in listings',async t=>{
   const f=await fixture(t,{loginLimit:3});
   const insertPasskey=(id,wrapped)=>f.store.db.prepare('INSERT INTO passkeys VALUES (?,?,?,?,?,?,NULL)').run(id,'AQID',0,wrapped,'iPhone',new Date().toISOString());
@@ -249,16 +271,39 @@ test('passkey boundaries: options gating, auth, revocation on rotate/reset, no s
   assert.equal(f.store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
 });
 
-test('schema v2 database migrates to v3 without touching existing rows',t=>{
+test('schema v2 database migrates to v4 without touching existing rows',t=>{
   const dir=mkdtempSync(join(tmpdir(),'account-migrate-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const file=join(dir,'account.db');
   let store=openStore(file);
   const before=store.snapshot();
-  store.db.exec('DROP TABLE passkeys; PRAGMA user_version=2;');store.db.close();
+  store.db.exec('ALTER TABLE accounts DROP COLUMN passkey_enabled; DROP TABLE passkeys; PRAGMA user_version=2;');store.db.close();
   store=openStore(file);
-  assert.equal(store.db.pragma('user_version',{simple:true}),3);
+  assert.equal(store.db.pragma('user_version',{simple:true}),4);
   assert.deepEqual(store.snapshot(),before);
   assert.equal(store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
-  store.db.exec('PRAGMA user_version=4;');store.db.close();
+  store.db.exec('PRAGMA user_version=5;');store.db.close();
   assert.throws(()=>openStore(file),/newer than this server/);
+});
+
+test('schema v3 database migrates to v4 preserving accounts and device links',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'account-migrate-v3-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const file=join(dir,'account.db');
+  let store=openStore(file);
+  const platform=store.db.prepare("SELECT id FROM platforms WHERE category='email' LIMIT 1").get();
+  const id=randomUUID(),deviceId=randomUUID(),timestamp=new Date().toISOString();
+  store.db.prepare('INSERT INTO accounts (id,category,platform_id,name,twofa_enabled,created_at,updated_at) VALUES (?,?,?,?,?,?,?)')
+    .run(id,'email',platform.id,'legacy@example.test',1,timestamp,timestamp);
+  store.db.prepare('INSERT INTO devices (id,name,created_at) VALUES (?,?,?)').run(deviceId,'Legacy Device',timestamp);
+  store.db.prepare('INSERT INTO account_devices (account_id,device_id) VALUES (?,?)').run(id,deviceId);
+  const before=store.snapshot();
+  store.db.exec('ALTER TABLE accounts DROP COLUMN passkey_enabled; PRAGMA user_version=3;');store.db.close();
+  store=openStore(file);
+  assert.equal(store.db.pragma('user_version',{simple:true}),4);
+  assert.deepEqual(store.snapshot(),before);
+  const migrated=store.snapshot().accounts.find(a=>a.id===id);
+  assert.equal(migrated.passkey_enabled,false);assert.equal(migrated.twofa_enabled,true);
+  assert.deepEqual(migrated.device_ids,[deviceId]);
+  assert.equal(store.db.pragma('integrity_check',{simple:true}),'ok');
+  assert.equal(store.db.pragma('foreign_key_check').length,0);
+  store.db.close();
 });
