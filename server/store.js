@@ -5,7 +5,8 @@ import { dirname } from 'node:path';
 import { HttpError } from './validation.js';
 
 const accountColumns = ['category', 'platform_id', 'name', 'encrypted_password', 'encrypted_2fa',
-  'phone', 'twofa_enabled', 'passkey_enabled', 'country_id', 'register_email_id', 'subscribe_apple_id', 'note', 'recovery_email'];
+  'phone', 'twofa_enabled', 'passkey_enabled', 'country_id', 'register_email_id', 'subscribe_apple_id', 'note', 'recovery_email',
+  'claude_status', 'claude_registered_at', 'claude_active_at', 'claude_banned_at'];
 const now = () => new Date().toISOString();
 
 export function openStore(filename) {
@@ -17,7 +18,7 @@ export function openStore(filename) {
   db.pragma('busy_timeout = 5000');
   db.pragma('synchronous = FULL');
   const version = db.pragma('user_version', { simple: true });
-  if (version > 4) throw new Error('Database schema is newer than this server');
+  if (version > 5) throw new Error('Database schema is newer than this server');
   if (version === 0) db.transaction(() => {
     db.exec(`
       CREATE TABLE platforms (id TEXT PRIMARY KEY, category TEXT NOT NULL CHECK(category IN ('email','apple','ai')),
@@ -75,6 +76,15 @@ export function openStore(filename) {
       PRAGMA user_version=4;
     `);
   })();
+  if (version < 5) db.transaction(() => {
+    db.exec(`
+      ALTER TABLE accounts ADD COLUMN claude_status TEXT CHECK(claude_status IN ('fresh','registered','active','banned'));
+      ALTER TABLE accounts ADD COLUMN claude_registered_at TEXT;
+      ALTER TABLE accounts ADD COLUMN claude_active_at TEXT;
+      ALTER TABLE accounts ADD COLUMN claude_banned_at TEXT;
+      PRAGMA user_version=5;
+    `);
+  })();
 
   const revision = () => db.prepare('SELECT revision FROM data_version WHERE id=1').get().revision;
   const meta = () => db.prepare('SELECT salt,canary,created_at FROM vault_meta WHERE id=1').get() || null;
@@ -130,6 +140,15 @@ export function openStore(filename) {
     if (row.category !== 'email') {
       if (accountData.passkey_enabled) throw new HttpError(400, '只有 Email 账号可以设置通行密钥');
       row.passkey_enabled = false;
+    }
+    const claudeDates = ['claude_registered_at', 'claude_active_at', 'claude_banned_at'];
+    if (row.category !== 'email') {
+      if (accountData.claude_status || claudeDates.some(k => accountData[k])) throw new HttpError(400, '只有 Email 账号可以记录 Claude 情况');
+      row.claude_status = null;
+    }
+    if (!['registered', 'active', 'banned'].includes(row.claude_status)) {
+      if (claudeDates.some(k => accountData[k])) throw new HttpError(400, '白号或未标记的账号不能填写 Claude 日期');
+      for (const k of claudeDates) row[k] = null;
     }
     const values = accountColumns.map(k => ['twofa_enabled', 'passkey_enabled'].includes(k) ? Number(!!row[k]) : row[k] ?? null);
     const timestamp = now();

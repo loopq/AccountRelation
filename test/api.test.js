@@ -160,7 +160,7 @@ test('empty-vault rotation and racing initialization',async t=>{
 
 test('devices CRUD, account device links, schema v2 and foreign keys',async t=>{
   const f=await fixture(t);await f.login();await f.initialize();
-  assert.equal(f.store.db.pragma('user_version',{simple:true}),4);
+  assert.equal(f.store.db.pragma('user_version',{simple:true}),5);
   const initialSnap=f.store.snapshot();
   assert.ok(Array.isArray(initialSnap.devices));assert.equal(initialSnap.devices.length,0);
   const addDev1=await f.change('/api/devices','POST',{name:'MacBook Pro',sort:1});
@@ -271,21 +271,21 @@ test('passkey boundaries: options gating, auth, revocation on rotate/reset, no s
   assert.equal(f.store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
 });
 
-test('schema v2 database migrates to v4 without touching existing rows',t=>{
+test('schema v2 database migrates to v5 without touching existing rows',t=>{
   const dir=mkdtempSync(join(tmpdir(),'account-migrate-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const file=join(dir,'account.db');
   let store=openStore(file);
   const before=store.snapshot();
-  store.db.exec('ALTER TABLE accounts DROP COLUMN passkey_enabled; DROP TABLE passkeys; PRAGMA user_version=2;');store.db.close();
+  store.db.exec('ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; ALTER TABLE accounts DROP COLUMN passkey_enabled; DROP TABLE passkeys; PRAGMA user_version=2;');store.db.close();
   store=openStore(file);
-  assert.equal(store.db.pragma('user_version',{simple:true}),4);
+  assert.equal(store.db.pragma('user_version',{simple:true}),5);
   assert.deepEqual(store.snapshot(),before);
   assert.equal(store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
-  store.db.exec('PRAGMA user_version=5;');store.db.close();
+  store.db.exec('PRAGMA user_version=6;');store.db.close();
   assert.throws(()=>openStore(file),/newer than this server/);
 });
 
-test('schema v3 database migrates to v4 preserving accounts and device links',t=>{
+test('schema v3 database migrates to v5 preserving accounts and device links',t=>{
   const dir=mkdtempSync(join(tmpdir(),'account-migrate-v3-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const file=join(dir,'account.db');
   let store=openStore(file);
@@ -296,9 +296,9 @@ test('schema v3 database migrates to v4 preserving accounts and device links',t=
   store.db.prepare('INSERT INTO devices (id,name,created_at) VALUES (?,?,?)').run(deviceId,'Legacy Device',timestamp);
   store.db.prepare('INSERT INTO account_devices (account_id,device_id) VALUES (?,?)').run(id,deviceId);
   const before=store.snapshot();
-  store.db.exec('ALTER TABLE accounts DROP COLUMN passkey_enabled; PRAGMA user_version=3;');store.db.close();
+  store.db.exec('ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; ALTER TABLE accounts DROP COLUMN passkey_enabled; PRAGMA user_version=3;');store.db.close();
   store=openStore(file);
-  assert.equal(store.db.pragma('user_version',{simple:true}),4);
+  assert.equal(store.db.pragma('user_version',{simple:true}),5);
   assert.deepEqual(store.snapshot(),before);
   const migrated=store.snapshot().accounts.find(a=>a.id===id);
   assert.equal(migrated.passkey_enabled,false);assert.equal(migrated.twofa_enabled,true);
@@ -306,4 +306,67 @@ test('schema v3 database migrates to v4 preserving accounts and device links',t=
   assert.equal(store.db.pragma('integrity_check',{simple:true}),'ok');
   assert.equal(store.db.pragma('foreign_key_check').length,0);
   store.db.close();
+});
+
+test('schema v4 database migrates to v5 preserving accounts, passkey flag and device links',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'account-migrate-v4-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const file=join(dir,'account.db');
+  let store=openStore(file);
+  const platform=store.db.prepare("SELECT id FROM platforms WHERE category='email' LIMIT 1").get();
+  const id=randomUUID(),deviceId=randomUUID(),timestamp=new Date().toISOString();
+  store.db.prepare('INSERT INTO accounts (id,category,platform_id,name,twofa_enabled,passkey_enabled,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)')
+    .run(id,'email',platform.id,'claude-legacy@example.test',1,1,timestamp,timestamp);
+  store.db.prepare('INSERT INTO devices (id,name,created_at) VALUES (?,?,?)').run(deviceId,'Claude Legacy Device',timestamp);
+  store.db.prepare('INSERT INTO account_devices (account_id,device_id) VALUES (?,?)').run(id,deviceId);
+  const before=store.snapshot();
+  store.db.exec('ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; PRAGMA user_version=4;');store.db.close();
+  store=openStore(file);
+  assert.equal(store.db.pragma('user_version',{simple:true}),5);
+  assert.deepEqual(store.snapshot(),before);
+  const migrated=store.snapshot().accounts.find(a=>a.id===id);
+  assert.equal(migrated.passkey_enabled,true);assert.equal(migrated.twofa_enabled,true);
+  assert.equal(migrated.claude_status,null);assert.equal(migrated.claude_registered_at,null);
+  assert.equal(migrated.claude_active_at,null);assert.equal(migrated.claude_banned_at,null);
+  assert.deepEqual(migrated.device_ids,[deviceId]);
+  assert.equal(store.db.pragma('integrity_check',{simple:true}),'ok');
+  assert.equal(store.db.pragma('foreign_key_check').length,0);
+  store.db.close();
+});
+
+test('email account claude status: dates kept across status changes, cleared on fresh/category change, rejected on non-email',async t=>{
+  const f=await fixture(t);await f.login();await f.initialize();
+  const snapshot=f.store.snapshot(),emailPlatform=snapshot.platforms.find(p=>p.category==='email'),applePlatform=snapshot.platforms.find(p=>p.category==='apple');
+  const base={category:'email',platform_id:emailPlatform.id,name:'claude@example.test'};
+  const read=id=>f.store.snapshot().accounts.find(a=>a.id===id);
+  const create=async data=>{const r=await f.change('/api/accounts','POST',data);assert.equal(r.status,200,JSON.stringify(r.data));return r.data.result.id;};
+  const assertDates=(row,registered,active,banned)=>{assert.equal(row.claude_registered_at,registered);assert.equal(row.claude_active_at,active);assert.equal(row.claude_banned_at,banned);};
+  const id=await create({...base,claude_status:'active',claude_registered_at:'2026-03-01',claude_active_at:'2026-03-05',claude_banned_at:'2026-03-10'});
+  let row=read(id);assert.equal(row.claude_status,'active');assertDates(row,'2026-03-01','2026-03-05','2026-03-10');
+  assert.equal((await f.change('/api/accounts/'+id,'PATCH',{name:'renamed@example.test'})).status,200);
+  row=read(id);assert.equal(row.claude_status,'active');assertDates(row,'2026-03-01','2026-03-05','2026-03-10');
+  assert.equal((await f.change('/api/accounts/'+id,'PATCH',{claude_status:'registered'})).status,200);
+  row=read(id);assert.equal(row.claude_status,'registered');assertDates(row,'2026-03-01','2026-03-05','2026-03-10');
+  assert.equal((await f.change('/api/accounts/'+id,'PATCH',{claude_status:'fresh'})).status,200);
+  row=read(id);assert.equal(row.claude_status,'fresh');assertDates(row,null,null,null);
+  assert.equal((await f.change('/api/accounts/'+id,'PATCH',{claude_status:null})).status,200);
+  row=read(id);assert.equal(row.claude_status,null);assertDates(row,null,null,null);
+  const beforeBadFresh=f.store.snapshot();
+  assert.equal((await f.change('/api/accounts','POST',{...base,name:'bad-fresh@example.test',claude_status:'fresh',claude_registered_at:'2026-03-01'})).status,400);
+  assert.deepEqual(f.store.snapshot(),beforeBadFresh);
+  assert.equal((await f.change('/api/accounts','POST',{...base,name:'bad-status@example.test',claude_status:'idle'})).status,400);
+  assert.equal((await f.change('/api/accounts','POST',{...base,name:'bad-date@example.test',claude_status:'active',claude_active_at:'2026-02-30'})).status,400);
+  assert.equal((await f.change('/api/accounts','POST',{...base,name:'bad-slash@example.test',claude_status:'active',claude_active_at:'2026/03/01'})).status,400);
+  assert.equal((await f.change('/api/accounts','POST',{category:'apple',platform_id:applePlatform.id,name:'claude-apple@example.test',claude_status:'active'})).status,400);
+  assert.equal((await f.change('/api/accounts','POST',{category:'apple',platform_id:applePlatform.id,name:'claude-apple-date@example.test',claude_active_at:'2026-03-05'})).status,400);
+  const moved=await create({...base,name:'moved@example.test',claude_status:'active',claude_registered_at:'2026-03-01',claude_active_at:'2026-03-05'});
+  assert.equal((await f.change('/api/accounts/'+moved,'PATCH',{category:'apple',platform_id:applePlatform.id})).status,200);
+  row=read(moved);assert.equal(row.category,'apple');assert.equal(row.claude_status,null);assertDates(row,null,null,null);
+  const imported=await f.change('/api/accounts/import','POST',[{...base,name:'imported@example.test',claude_status:'active',claude_registered_at:'2026-03-01'}]);
+  assert.equal(imported.status,200);
+  row=(await f.call('/api/state')).data.accounts.find(a=>a.name==='imported@example.test');
+  assert.equal(row.claude_status,'active');assert.equal(row.claude_registered_at,'2026-03-01');
+  const beforeBadImport=f.store.snapshot();
+  assert.equal((await f.change('/api/accounts/import','POST',[{...base,name:'import-ok@example.test',claude_status:'active'},{category:'apple',platform_id:applePlatform.id,name:'import-bad@example.test',claude_status:'active'}])).status,400);
+  assert.deepEqual(f.store.snapshot(),beforeBadImport);
+  assert.equal(f.store.db.pragma('integrity_check',{simple:true}),'ok');
 });

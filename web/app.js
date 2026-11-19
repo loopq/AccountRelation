@@ -70,7 +70,7 @@ function clearSensitive() {
   document.getElementById('sdrawerBody').replaceChildren();
   document.getElementById('mpw').value = '';
   document.getElementById('loginPw').value = '';
-  qInput.value = ''; query = '';
+  qInput.value = ''; query = ''; claudeFilter = '';
   connState.textContent = '';
   clearTimeout(window._clipT);
   if (copiedByApp) navigator.clipboard?.writeText('').catch(()=>{});
@@ -99,6 +99,10 @@ const CAT_LABEL = { email: 'Email', apple: 'Apple', ai: 'AI 工具' };
 const CAT_COLOR = { email: 'var(--cat-email)', apple: 'var(--cat-apple)', ai: 'var(--cat-ai)' };
 const CAT_ICON = { email: 'i-mail', apple: 'i-id', ai: 'i-spark' };
 const icon = (name) => `<svg class="ic" aria-hidden="true"><use href="#${name}"/></svg>`;
+const CLAUDE_STATUS = { fresh: '白号', registered: '已注册', active: '使用中', banned: '已封禁' };
+const CLAUDE_DATED = ['registered', 'active', 'banned'];
+const CLAUDE_DATE_FIELDS = [['claude_registered_at', '注册', 'f-claude-reg'], ['claude_active_at', '使用', 'f-claude-active'], ['claude_banned_at', '封禁', 'f-claude-banned']];
+const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 // ============ 数据 ============
 let state = emptyState();
@@ -153,7 +157,7 @@ function emailOf(a) {
   return e ? e.name : null;
 }
 
-let devFilter = '';
+let devFilter = '', claudeFilter = '';
 function matchDevFilter(a) {
   if (!devFilter) return true;
   const ids = a.device_ids || [];
@@ -170,6 +174,33 @@ function devFilterBar() {
   }).join('');
   bar.innerHTML = `<select aria-label="按设备筛选">${opt('', '全部设备')}${opt('__none', '未登录任何设备')}${devOpts}</select>`;
   bar.querySelector('select').onchange = (e) => { devFilter = e.target.value; render(); };
+  return bar;
+}
+
+function matchClaude(a) {
+  if (!claudeFilter) return true;
+  if (claudeFilter === '__none') return !a.claude_status;
+  return a.claude_status === claudeFilter;
+}
+function claudeStatsBar(all) {
+  const bar = document.createElement('div');
+  bar.className = 'claude-stats';
+  const count = v => all.filter(a => v === '__none' ? !a.claude_status : a.claude_status === v).length;
+  const none = count('__none');
+  const btn = (v, label) => `<button type="button" class="stat claude-${v}" data-claude="${v}" aria-pressed="${claudeFilter === v}">${label} <b>${count(v)}</b></button>`;
+  const statusBtns = ['fresh', 'registered', 'active', 'banned'].map(v => btn(v, CLAUDE_STATUS[v])).join('');
+  bar.innerHTML = `<span class="lbl">Claude</span>${statusBtns}${none > 0 || claudeFilter === '__none' ? btn('__none', '未标记') : ''}`;
+  bar.querySelectorAll('[data-claude]').forEach(b => b.onclick = () => {
+    claudeFilter = claudeFilter === b.dataset.claude ? '' : b.dataset.claude;
+    render();
+  });
+  return bar;
+}
+function emailBar(all) {
+  const bar = document.createElement('div');
+  bar.className = 'email-bar';
+  bar.appendChild(claudeStatsBar(all));
+  if (state.devices.length) bar.appendChild(devFilterBar());
   return bar;
 }
 
@@ -191,7 +222,7 @@ function render() {
   if (devFilter && devFilter !== '__none' && !deviceById(devFilter)) devFilter = '';
   for (const cat of ['email', 'apple', 'ai']) {
     const all = state.accounts.filter(a => a.category === cat);
-    const list = (cat === 'email' ? all.filter(matchDevFilter) : all).filter(matchQuery);
+    const list = (cat === 'email' ? all.filter(matchDevFilter).filter(matchClaude) : all).filter(matchQuery);
     const cnt = list.length || '';
     document.getElementById('count-' + cat).textContent = cnt;
     document.getElementById('tab-count-' + cat).textContent = cnt;
@@ -201,9 +232,7 @@ function render() {
       continue;
     }
     box.innerHTML = '';
-    if (cat === 'email' && state.devices.length) {
-      box.appendChild(devFilterBar());
-    }
+    if (cat === 'email') box.appendChild(emailBar(all));
     if (!list.length) {
       const empty = document.createElement('div');
       empty.className = 'col-empty';
@@ -226,6 +255,7 @@ function renderCard(a) {
     chips.push(countryTag(a.country_id));
     if (a.twofa_enabled) chips.push(`<span class="chip ok">${icon('i-check')}2FA</span>`);
     if (a.category === 'email' && a.passkey_enabled) chips.push(`<span class="chip ok">${icon('i-check')}通行密钥</span>`);
+    if (a.category === 'email' && a.claude_status) chips.push(`<span class="chip claude-${a.claude_status}">Claude · ${CLAUDE_STATUS[a.claude_status]}</span>`);
   }
   // 键值行：[标签, HTML]
   const rows = [];
@@ -235,6 +265,8 @@ function renderCard(a) {
     const devNames = state.devices.filter(d => a.device_ids?.includes(d.id))
       .map(d => `<span class="${deviceCount(d.id) > DEVICE_CAP ? 'over' : ''}">${esc(d.name)}</span>`).join(', ');
     if (devNames) rows.push(['设备', devNames]);
+    const claudeDates = CLAUDE_DATE_FIELDS.filter(([k]) => a[k]).map(([k, label]) => `${label} ${esc(a[k])}`);
+    if (claudeDates.length) rows.push(['Claude', `<span class="mono">${claudeDates.join(' · ')}</span>`]);
   }
   if (a.recovery_email) rows.push(['辅邮', `<span class="mono">${esc(a.recovery_email)}</span>`]);
   if (a.register_email_id) {
@@ -389,6 +421,20 @@ function openForm(a) {
       </div>
     </div>
 
+    <div class="group field-claude">
+      <div class="group-title">Claude 情况</div>
+      <label for="f-claude">状态</label>
+      <select id="f-claude">
+        <option value="">— 未标记 —</option>
+        ${Object.entries(CLAUDE_STATUS).map(([v, label]) => `<option value="${v}" ${a.claude_status === v ? 'selected' : ''}>${label}</option>`).join('')}
+      </select>
+      <div class="claude-dates">
+        <div><label for="f-claude-reg">注册日期</label><input type="date" id="f-claude-reg" value="${esc(a.claude_registered_at || '')}"></div>
+        <div><label for="f-claude-active">开始使用（Pro）</label><input type="date" id="f-claude-active" value="${esc(a.claude_active_at || '')}"></div>
+        <div><label for="f-claude-banned">封禁日期</label><input type="date" id="f-claude-banned" value="${esc(a.claude_banned_at || '')}"></div>
+      </div>
+    </div>
+
     <div class="group">
       <div class="group-title">安全</div>
       <label for="f-pw">密码</label>
@@ -443,11 +489,20 @@ function openForm(a) {
     body.querySelector('.field-devices').classList.toggle('hidden', cat !== 'email');
     body.querySelector('.field-email-apple').classList.toggle('hidden', !(cat === 'email' || cat === 'apple'));
     body.querySelector('.field-passkey').classList.toggle('hidden', cat !== 'email');
+    body.querySelector('.field-claude').classList.toggle('hidden', cat !== 'email');
     body.querySelector('.field-register').classList.toggle('hidden', !(cat === 'apple' || cat === 'ai'));
     body.querySelector('.field-subscribe').classList.toggle('hidden', cat !== 'ai');
   };
   platSel.onchange = applyCat;
   applyCat();
+  const claudeSel = body.querySelector('#f-claude');
+  const syncClaudeDates = () => body.querySelector('.claude-dates').classList.toggle('hidden', !CLAUDE_DATED.includes(claudeSel.value));
+  claudeSel.onchange = () => {
+    syncClaudeDates();
+    const input = { registered: '#f-claude-reg', active: '#f-claude-active', banned: '#f-claude-banned' }[claudeSel.value];
+    if (input) { const el = body.querySelector(input); if (!el.value) el.value = localToday(); }
+  };
+  syncClaudeDates();
 
   // 已有密码 / 2FA 密钥:解密填入。_loaded 标记区分「已加载后清空(=清除)」与「解密失败的空(=保留)」
   const formId = crypto.randomUUID();
@@ -499,6 +554,10 @@ async function saveAccount(a, isNew, ctx) {
     row.phone = null; row.country_id = null; row.twofa_enabled = false; row.recovery_email = null;
   }
   row.passkey_enabled = cat === 'email' ? body.querySelector('#f-passkey').checked : false;
+  const claudeStatus = cat === 'email' ? (body.querySelector('#f-claude').value || null) : null;
+  const claudeDated = CLAUDE_DATED.includes(claudeStatus);
+  row.claude_status = claudeStatus;
+  for (const [key, , el] of CLAUDE_DATE_FIELDS) row[key] = claudeDated ? (body.querySelector('#' + el).value || null) : null;
   row.register_email_id = (cat === 'apple' || cat === 'ai') ? (body.querySelector('#f-register').value || null) : null;
   row.subscribe_apple_id = (cat === 'ai') ? (body.querySelector('#f-subscribe').value || null) : null;
 
@@ -647,7 +706,7 @@ function renderSettings() {
     </div>
     <div class="group">
       <div class="group-title">批量导入</div>
-      <textarea id="importJson" class="mono" placeholder='[{"platform":"Gmail","name":"x@gmail.com","password":"...","recovery_email":"...","twofa_secret":"...","phone":"...","twofa_enabled":true,"passkey_enabled":true}]' style="min-height:96px" spellcheck="false"></textarea>
+      <textarea id="importJson" class="mono" placeholder='[{"platform":"Gmail","name":"x@gmail.com","password":"...","recovery_email":"...","twofa_secret":"...","phone":"...","twofa_enabled":true,"passkey_enabled":true,"claude_status":"active","claude_registered_at":"2026-03-01"}]' style="min-height:96px" spellcheck="false"></textarea>
       <div class="btn-row"><button id="importBtn">解析并导入</button></div>
       <div class="hint" id="importMsg">password 和 2FA 密钥在本地加密后入库。platform 必须是已有平台名。</div>
       <div class="hint">密码与 2FA 密钥已加密；账号名称、联系方式和备注作为元数据保存。</div>
@@ -779,6 +838,8 @@ async function doBatchImport() {
       if (item.country && !country) throw new Error('国家/地区不存在: '+item.country);
       rows.push({ category:plat.category,platform_id:plat.id,name:item.name,
         phone:item.phone || null,twofa_enabled:!!item.twofa_enabled,passkey_enabled:!!item.passkey_enabled,recovery_email:item.recovery_email || null,
+        claude_status:item.claude_status ?? null,claude_registered_at:item.claude_registered_at ?? null,
+        claude_active_at:item.claude_active_at ?? null,claude_banned_at:item.claude_banned_at ?? null,
         country_id:country?.id || null,note:item.note || null,
         encrypted_password:item.password ? await encryptWith(ctx.key,item.password) : null,
         encrypted_2fa:item.twofa_secret ? await encryptWith(ctx.key,item.twofa_secret) : null });

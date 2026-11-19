@@ -50,8 +50,8 @@ scripts/test.sh
 
 `node scripts/backup.mjs` 通过管理员 SSH 获取一致副本，并在本机用 AES-256-GCM 加密到 `~/Backups/account-relation`。独立密钥在 `~/.config/account-relation/backup.key`，0600；应另行保管其恢复副本。`scripts/restore-backup.mjs` 只恢复到不存在的新文件并检查 integrity/外键，不会覆盖生产数据库。自动任务的成功/失败写本地日志；Mac 离线时无法拉取，远端本地备份不能替代异地副本。
 
-发布前备份数据库并保留上一镜像。恢复代码使用 `/etc/account-relation/previous.env`；数据库恢复必须停止应用并使用经过检查的完整备份，不删除 volume、不把新 schema 的库强行交给旧代码。当前 schema 版本 4；未来迁移应逐版本增加，拒绝打开更高版本库。schema 已升到 4，回退到旧镜像前必须先恢复对应的 `predeploy-*.db`（旧镜像遇到 v4 库会拒绝启动），或先停止应用并执行 `ALTER TABLE accounts DROP COLUMN passkey_enabled; PRAGMA user_version=3;` 降级（保留发布后的其他写入）。
+发布前备份数据库并保留上一镜像。恢复代码使用 `/etc/account-relation/previous.env`；数据库恢复必须停止应用并使用经过检查的完整备份，不删除 volume、不把新 schema 的库强行交给旧代码。当前 schema 版本 5；未来迁移应逐版本增加，拒绝打开更高版本库。schema 已升到 5，回退到旧镜像前必须先恢复对应的 `predeploy-*.db`（旧镜像遇到 v5 库会拒绝启动），或先停止应用并执行 `ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; PRAGMA user_version=4;` 降级（降到 v4，保留通行密钥列与发布后的其他写入）。
 
 ## 范围
 
-`mobile/` 是独立 Flutter 客户端，仍使用自己的旧协议，本次没有改造或重新构建。`supabase/schema.sql` 是历史/移动端参考，未打入网页版镜像。原 UI 的分类、主题、手机 tab、导入导出、关联与加密功能保留，新增 Email 账号登录设备记录与卡片概况预览（眼睛图标弹窗）。2026-11-11 重做了表现层：系统字体、内联 SVG 图标、品牌化登录/解锁页、分组表单、带遮罩的抽屉，以及 header 的跨列搜索（按 `/` 聚焦）；样式仍内联在 `web/index.html`，没有新增静态文件或构建步骤。
+`mobile/` 是独立 Flutter 客户端，仍使用自己的旧协议，本次没有改造或重新构建。`supabase/schema.sql` 是历史/移动端参考，未打入网页版镜像。原 UI 的分类、主题、手机 tab、导入导出、关联与加密功能保留，新增 Email 账号登录设备记录与卡片概况预览（眼睛图标弹窗）。2026-11-11 重做了表现层：系统字体、内联 SVG 图标、品牌化登录/解锁页、分组表单、带遮罩的抽屉，以及 header 的跨列搜索（按 `/` 聚焦）；样式仍内联在 `web/index.html`，没有新增静态文件或构建步骤。Email 账号可记录 Claude 情况状态 / 日期，并在 Email 列顶部按状态盘点筛选。
