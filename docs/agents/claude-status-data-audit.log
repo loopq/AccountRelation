@@ -1,0 +1,41 @@
+# 2026-11-19 #26 Email Claude 情况：生产库只读核对（只输出行数与内容指纹，不输出数据）
+# 脚本：容器内 better-sqlite3 readonly 打开 /data/account.db；accounts 指纹只取 v4 已有列（发布前后可比）；admins/sessions/passkeys 只计数
+
+## 发布前（release 7be7886afdfcd760a170）
+USER_VERSION 4
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=1
+passkeys count=1
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=428fa2daa70d39cb
+platforms count=6 fp=f0b6ad80ce25a1d8
+countries count=7 fp=13d3575ef4b81365
+devices count=6 fp=ebe4c234100ea947
+account_devices count=15 fp=fcb1d66a067ad30b
+accounts count=27 fp_v4cols=a301a996c5e544d8 email=15
+claude_columns absent
+
+## 发布后（release 6a56c9439a4e53953d2d，predeploy 备份 predeploy-20261119T060106Z.db）
+USER_VERSION 5
+INTEGRITY ok
+FK_VIOLATIONS 0
+admins count=1
+sessions count=1
+passkeys count=1
+vault_meta count=1 fp=779479df4c1d1f10
+data_version count=1 fp=428fa2daa70d39cb
+platforms count=6 fp=f0b6ad80ce25a1d8
+countries count=7 fp=13d3575ef4b81365
+devices count=6 fp=ebe4c234100ea947
+account_devices count=15 fp=fcb1d66a067ad30b
+accounts count=27 fp_v4cols=a301a996c5e544d8 email=15
+claude_columns claude_status,claude_registered_at,claude_active_at,claude_banned_at
+claude_status non_null=0
+claude_registered_at non_null=0
+claude_active_at non_null=0
+claude_banned_at non_null=0
+
+## 结论
+schema 4 → 5 只新增 4 个可空列且全为 NULL（= 未标记）；保险库、revision、27 个账号的原有列、平台、国家、设备与设备关联指纹与发布前完全一致；integrity ok、外键无违规。

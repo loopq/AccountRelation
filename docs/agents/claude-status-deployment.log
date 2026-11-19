@@ -1,0 +1,71 @@
+# 2026-11-19 #26 Email Claude 情况：scripts/deploy.sh 发布输出（release 6a56c9439a4e53953d2d，git 基线 0fcd55f + 未提交改动，manifest 逐文件 SHA256 服务器端核对）
+
+source.tar.gz: OK
+RELEASE_MANIFEST_VERIFIED 0fcd55fcd0a7236af27d194d9df5f5890ead36c9
+#0 building with "default" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.04kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#2 DONE 0.0s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 244B done
+#3 DONE 0.0s
+
+#4 [internal] load build context
+#4 transferring context: 105.22kB done
+#4 DONE 0.0s
+
+#5 [dependencies 1/5] FROM docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+#5 resolve docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 0.0s done
+#5 DONE 0.0s
+
+#6 [dependencies 5/5] RUN npm ci --omit=dev && npm cache clean --force
+#6 CACHED
+
+#7 [dependencies 3/5] RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+#7 CACHED
+
+#8 [dependencies 4/5] COPY package.json package-lock.json ./
+#8 CACHED
+
+#9 [dependencies 2/5] WORKDIR /app
+#9 CACHED
+
+#10 [stage-1 3/7] COPY --from=dependencies /app/node_modules ./node_modules
+#10 CACHED
+
+#11 [stage-1 4/7] COPY package.json ./
+#11 CACHED
+
+#12 [stage-1 5/7] COPY server ./server
+#12 DONE 0.0s
+
+#13 [stage-1 6/7] COPY web/index.html web/app.js web/api-client.js web/crypto.js web/theme.js web/sw.js web/manifest.webmanifest ./web/
+#13 DONE 0.1s
+
+#14 [stage-1 7/7] COPY web/icons ./web/icons
+#14 DONE 0.0s
+
+#15 exporting to image
+#15 exporting layers 0.1s done
+#15 exporting manifest sha256:bb6b96b606af0b0709a0329bc31db0fcf75d291f785343a6154ba146547f425b
+#15 exporting manifest sha256:bb6b96b606af0b0709a0329bc31db0fcf75d291f785343a6154ba146547f425b 0.0s done
+#15 exporting config sha256:98dc81bdcc9bb295694fa60d838f706dff0a4f4eac823cc8364e9ac4f6f824d0 0.0s done
+#15 exporting attestation manifest sha256:6fea1fc545b2bdef9ca9a93191565e351f565668fcb51591bfe5d034f83d8540 0.0s done
+#15 exporting manifest list sha256:d2af508ceb254c6db72e1351457d632b29cfef75dd1866b9e2071b934ff3ce41 0.0s done
+#15 naming to docker.io/library/account-relation:6a56c9439a4e53953d2d done
+#15 unpacking to docker.io/library/account-relation:6a56c9439a4e53953d2d 0.0s done
+#15 DONE 0.3s
+sha256:d2af508ceb254c6db72e1351457d632b29cfef75dd1866b9e2071b934ff3ce41 amd64
+Consistent SQLite backup verified.
+ Container account-relation-app-1 Recreate
+ Container account-relation-app-1 Recreated
+ Container account-relation-app-1 Starting
+ Container account-relation-app-1 Started
+ Container account-relation-app-1 Waiting
+ Container account-relation-app-1 Healthy
+DEPLOYED_RELEASE=6a56c9439a4e53953d2d

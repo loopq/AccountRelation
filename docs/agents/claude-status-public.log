@@ -1,0 +1,7 @@
+# 2026-11-19 #26 Email Claude 情况：公网核对（release 6a56c9439a4e53953d2d）
+local web/index.html sha256=995c5082816125d54a8310359a613b472f2388d179c538969fc59a158b2955bb
+local web/app.js     sha256=87bdb63ecaf7370af5299950351c35993600fd6125756b414955825afe5e866a
+public https://account.loopq.cn/ 与 /app.js sha256 连续 10 次均与本地一致：10/10
+GET /health -> 200
+匿名 GET /api/state -> 401
+线上 app.js 含 claudeStatsBar（新盘点条代码已生效）
