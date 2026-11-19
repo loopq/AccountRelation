@@ -22,6 +22,7 @@ web/verify-v2-supabase.html
 Thumbs.db
 .vscode/
 .idea/
+.codex/
 *.swp
 *~
 *.log
