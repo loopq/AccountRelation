@@ -69,7 +69,7 @@ test('authentication, CSRF, cookies, validation, host and static boundaries',asy
   assert.equal((await f.call('/api/signup','POST',{})).status,404);
   assert.equal((await f.call('/api/state','GET',undefined,{Host:'another.test'})).status,421);
   for(const path of ['/data/account.db','/.env','/server/admin.js','/verify-v2-supabase.html']) assert.equal((await f.call(path)).status,404);
-  const page=await f.call('/');assert.equal(page.status,200);assert.match(page.headers.get('content-security-policy'),/script-src 'self'/);
+  const page=await f.call('/');assert.equal(page.status,200);assert.match(page.headers.get('content-security-policy'),/script-src 'self'/);assert.match(page.data,/href="\/password-generator"/);
   const pgPage=await f.call('/password-generator');assert.equal(pgPage.status,200);assert.match(pgPage.headers.get('content-security-policy'),/script-src 'self'/);assert.match(pgPage.data,/密码生成器/);
   assert.equal((await f.call('/password-generator/')).status,200);
   assert.equal((await f.call('/password-generator.js')).status,200);

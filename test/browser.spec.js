@@ -2,8 +2,10 @@ import { test,expect } from '@playwright/test';
 const admin='Test-browser-admin-4792!',master='731942',nextMaster='856137';
 async function login(page) {
   await page.goto('/');
+  await expect(page.locator('#loginPwGen')).toBeVisible();
   await page.locator('#loginEmail').fill('admin@example.test');await page.locator('#loginPw').fill(admin);await page.locator('#loginBtn').click();
   await expect(page.locator('#lock')).toBeVisible();
+  await expect(page.locator('#loginPwGen')).toBeHidden();
 }
 async function unlock(page,pw) {await page.locator('#mpw').fill(pw);await page.locator('#unlockBtn').click();await expect(page.locator('#lock')).toBeHidden();}
 
@@ -303,6 +305,11 @@ test('public password generator works without login on desktop and mobile portra
   page.on('request', r => { if (new URL(r.url()).pathname.startsWith('/api/')) apiRequests.push(r.url()); });
 
   await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/');
+  await expect(page.locator('#loginPwGen')).toBeVisible();
+  await page.locator('#loginPwGen').click();
+  await expect(page).toHaveURL(/\/password-generator$/);
+  apiRequests.length = 0;
   const res = await page.goto('/password-generator');
   expect(res.status()).toBe(200);
 
