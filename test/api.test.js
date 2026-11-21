@@ -342,6 +342,8 @@ test('email account claude status: dates kept across status changes, cleared on 
   const assertDates=(row,registered,active,banned)=>{assert.equal(row.claude_registered_at,registered);assert.equal(row.claude_active_at,active);assert.equal(row.claude_banned_at,banned);};
   const id=await create({...base,claude_status:'active',claude_registered_at:'2026-03-01',claude_active_at:'2026-03-05',claude_banned_at:'2026-03-10'});
   let row=read(id);assert.equal(row.claude_status,'active');assertDates(row,'2026-03-01','2026-03-05','2026-03-10');
+  const bannedEmpty=await create({...base,name:'banned-empty@example.test',claude_status:'banned',claude_banned_at:null});
+  row=read(bannedEmpty);assert.equal(row.claude_status,'banned');assertDates(row,null,null,null);
   assert.equal((await f.change('/api/accounts/'+id,'PATCH',{name:'renamed@example.test'})).status,200);
   row=read(id);assert.equal(row.claude_status,'active');assertDates(row,'2026-03-01','2026-03-05','2026-03-10');
   assert.equal((await f.change('/api/accounts/'+id,'PATCH',{claude_status:'registered'})).status,200);

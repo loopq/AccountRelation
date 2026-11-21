@@ -499,7 +499,7 @@ function openForm(a) {
   const syncClaudeDates = () => body.querySelector('.claude-dates').classList.toggle('hidden', !CLAUDE_DATED.includes(claudeSel.value));
   claudeSel.onchange = () => {
     syncClaudeDates();
-    const input = { registered: '#f-claude-reg', active: '#f-claude-active', banned: '#f-claude-banned' }[claudeSel.value];
+    const input = { registered: '#f-claude-reg', active: '#f-claude-active' }[claudeSel.value];
     if (input) { const el = body.querySelector(input); if (!el.value) el.value = localToday(); }
   };
   syncClaudeDates();
