@@ -294,3 +294,87 @@ test('Face ID passkey: one gesture logs in and unlocks; replay, idle lock, rotat
   await expect(page.locator('.card:has-text("passkey@example.test")')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
+
+test('public password generator works without login on desktop and mobile portrait', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+  const errors = [];
+  const apiRequests = [];
+  page.on('pageerror', e => errors.push(e.message));
+  page.on('request', r => { if (new URL(r.url()).pathname.startsWith('/api/')) apiRequests.push(r.url()); });
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const res = await page.goto('/password-generator');
+  expect(res.status()).toBe(200);
+
+  // 默认状态：随机模式、16 位、数字和符号均勾选、已生成 16 位含数字和符号的密码
+  await expect(page.locator('.seg-tab.active')).toHaveAttribute('data-mode', 'random');
+  await expect(page.locator('#lenRange')).toHaveValue('16');
+  await expect(page.locator('#lenNum')).toHaveValue('16');
+  await expect(page.locator('#optNumbers')).toBeChecked();
+  await expect(page.locator('#optSymbols')).toBeChecked();
+  const initialPw = await page.locator('#pwText').textContent();
+  expect(initialPw).toHaveLength(16);
+  expect(initialPw).toMatch(/[0-9]/);
+  expect(initialPw).toMatch(/[^a-zA-Z0-9]/);
+
+  // 刷新密码
+  await page.locator('#refreshBtn').click();
+  const refreshedPw = await page.locator('#pwText').textContent();
+  expect(refreshedPw).toHaveLength(16);
+  expect(refreshedPw).not.toBe(initialPw);
+
+  // 修改长度并关闭数字/符号开关
+  await page.locator('#lenNum').fill('24');
+  await page.locator('#lenNum').blur();
+  await expect(page.locator('#lenRange')).toHaveValue('24');
+  expect((await page.locator('#pwText').textContent()).length).toBe(24);
+
+  await page.locator('#optNumbers').uncheck({ force: true });
+  await page.locator('#optSymbols').uncheck({ force: true });
+  const lettersOnly = await page.locator('#pwText').textContent();
+  expect(lettersOnly).toMatch(/^[a-zA-Z]{24}$/);
+
+  // 切换容易记住与 PIN 模式
+  await page.locator('.seg-tab[data-mode="memorable"]').click();
+  const memorable = await page.locator('#pwText').textContent();
+  expect(memorable.split('-')).toHaveLength(4);
+
+  await page.locator('.seg-tab[data-mode="pin"]').click();
+  const pin = await page.locator('#pwText').textContent();
+  expect(pin).toMatch(/^\d{6}$/);
+
+  // 切回随机模式并测试复制按钮反馈
+  await page.locator('.seg-tab[data-mode="random"]').click();
+  await page.locator('#copyBtn').click();
+  await expect(page.locator('#copyBtnText')).toHaveText('已复制');
+  await expect(page.locator('#toast')).toContainText('密码已复制到剪贴板');
+
+  // 切换明暗主题
+  const beforeTheme = await page.locator('html').getAttribute('data-theme');
+  await page.locator('#themeToggle').click();
+  const afterTheme = await page.locator('html').getAttribute('data-theme');
+  expect(afterTheme).not.toBe(beforeTheme);
+
+  // 手机竖屏适配检查（无横向溢出，卡片完整在视口内）
+  for (const vp of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {
+    await page.setViewportSize(vp);
+    const metrics = await page.evaluate(() => {
+      const card = document.querySelector('.gen-card').getBoundingClientRect();
+      const lbl = document.querySelector('#panel-random .ctrl-lbl').getBoundingClientRect();
+      return {
+        overflowX: document.documentElement.scrollWidth > window.innerWidth,
+        cardLeft: card.left,
+        cardRight: card.right,
+        innerWidth: window.innerWidth,
+        lblHeight: lbl.height,
+      };
+    });
+    expect(metrics.overflowX).toBe(false);
+    expect(metrics.cardLeft).toBeGreaterThanOrEqual(0);
+    expect(metrics.cardRight).toBeLessThanOrEqual(metrics.innerWidth + 1);
+    expect(metrics.lblHeight).toBeLessThan(32);
+  }
+
+  expect(apiRequests).toEqual([]);
+  expect(errors).toEqual([]);
+});

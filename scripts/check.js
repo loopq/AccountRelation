@@ -7,7 +7,9 @@ for (const dir of ['server','web','scripts','test']) {
     if (result.status) process.exit(result.status);
   }
 }
-const html=readFileSync('web/index.html','utf8');
-if (/<script(?![^>]*src=)[^>]*>/.test(html)) throw new Error('Inline scripts violate CSP');
-if (/supabase|publishable/i.test(html)) throw new Error('Legacy backend remains in deployed HTML');
+for (const file of ['web/index.html','web/password-generator.html']) {
+  const html=readFileSync(file,'utf8');
+  if (/<script(?![^>]*src=)[^>]*>/.test(html)) throw new Error(`Inline scripts violate CSP in ${file}`);
+  if (/supabase|publishable/i.test(html)) throw new Error(`Legacy backend remains in ${file}`);
+}
 console.log('JavaScript syntax and production entrypoint checks passed.');

@@ -1,5 +1,6 @@
 const CACHE = 'ag-shell-v2-self-hosted';
 const SHELL = ['/', '/index.html', '/app.js', '/api-client.js', '/crypto.js', '/theme.js', '/manifest.webmanifest',
+  '/password-generator', '/password-generator.js',
   '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png', '/icons/apple-touch-icon-180.png'];
 self.addEventListener('install',event => event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event => event.waitUntil(caches.keys()

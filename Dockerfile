@@ -10,7 +10,7 @@ WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json ./
 COPY server ./server
-COPY web/index.html web/app.js web/api-client.js web/crypto.js web/theme.js web/sw.js web/manifest.webmanifest ./web/
+COPY web/index.html web/app.js web/api-client.js web/crypto.js web/theme.js web/sw.js web/manifest.webmanifest web/password-generator.html web/password-generator.js ./web/
 COPY web/icons ./web/icons
 USER 1000:1000
 EXPOSE 3000

@@ -12,5 +12,7 @@
 !web/theme.js
 !web/sw.js
 !web/manifest.webmanifest
+!web/password-generator.html
+!web/password-generator.js
 !web/icons/
 !web/icons/**

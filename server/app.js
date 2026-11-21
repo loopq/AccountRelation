@@ -7,8 +7,17 @@ import { createPasskeys } from './passkey.js';
 import * as v from './validation.js';
 
 const webDir = resolve(dirname(fileURLToPath(import.meta.url)),'../web');
-const staticPaths = new Set(['/','/index.html','/app.js','/api-client.js','/crypto.js','/theme.js','/sw.js','/manifest.webmanifest',
-  '/icons/icon-192.png','/icons/icon-512.png','/icons/maskable-512.png','/icons/apple-touch-icon-180.png','/icons/icon.svg']);
+const staticAliases = new Map([
+  ['/', '/index.html'],
+  ['/password-generator', '/password-generator.html'],
+  ['/password-generator/', '/password-generator.html'],
+]);
+const staticPaths = new Set([
+  ...staticAliases.keys(),
+  '/index.html','/app.js','/api-client.js','/crypto.js','/theme.js','/sw.js','/manifest.webmanifest',
+  '/password-generator.html','/password-generator.js',
+  '/icons/icon-192.png','/icons/icon-512.png','/icons/maskable-512.png','/icons/apple-touch-icon-180.png','/icons/icon.svg'
+]);
 export async function createApp(store, { origin = 'http://127.0.0.1:3000', production = false, loginLimit, sessionSeconds } = {}) {
   const parsedOrigin = new URL(origin);
   if (parsedOrigin.origin !== origin || (production && parsedOrigin.protocol !== 'https:')) throw new Error('APP_ORIGIN must be an exact origin; HTTPS required in production');
@@ -75,7 +84,7 @@ export async function createApp(store, { origin = 'http://127.0.0.1:3000', produ
   app.get(/.*/,(req,res) => {
     if (!staticPaths.has(req.path)) return res.status(404).end();
     res.set('Cache-Control',req.path.startsWith('/icons/') ? 'public, max-age=86400' : 'no-cache');
-    res.sendFile(resolve(webDir,'.'+(req.path==='/' ? '/index.html' : req.path)));
+    res.sendFile(resolve(webDir,'.'+(staticAliases.get(req.path) ?? req.path)));
   });
   app.use((error,_req,res,_next) => {
     const status = error.status || (error.type === 'entity.too.large' ? 413 : 500);

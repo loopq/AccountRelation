@@ -6,7 +6,7 @@ os.chdir(root)
 files=[pathlib.Path(p) for p in ['Dockerfile','.dockerignore','package.json','package-lock.json']]
 for directory in ['server','deploy','scripts','test']:
  files.extend(p for p in pathlib.Path(directory).rglob('*') if p.is_file() and p.suffix not in ('.log','.db','.zip'))
-files.extend(pathlib.Path('web')/p for p in ['index.html','app.js','api-client.js','crypto.js','theme.js','sw.js','manifest.webmanifest'])
+files.extend(pathlib.Path('web')/p for p in ['index.html','app.js','api-client.js','crypto.js','theme.js','sw.js','manifest.webmanifest','password-generator.html','password-generator.js'])
 files.extend(p for p in pathlib.Path('web/icons').rglob('*') if p.is_file())
 files.append(pathlib.Path('playwright.config.js'))
 manifest={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(set(files))}
