@@ -258,9 +258,9 @@ test('Face ID passkey: one gesture logs in and unlocks; replay, idle lock, rotat
   await page.reload();await expect(page.locator('#lock')).toBeVisible();
   await page.locator('#pkUnlock').click();await expect(page.locator('#lock')).toBeHidden();
   await expect(page.locator('.card:has-text("passkey@example.test")')).toHaveCount(1);
-  // 回访锁：离开 4 分钟不锁，离开 5 分钟以上锁
-  await away(page,4*60_000);await expect(page.locator('#lock')).toBeHidden();
-  await away(page,5*60_000+1000);await expect(page.locator('#lock')).toBeVisible();await expect(page.locator('#pkUnlock')).toBeVisible();
+  // 回访锁：离开 89 分钟不锁，离开 90 分钟以上锁
+  await away(page,89*60_000);await expect(page.locator('#lock')).toBeHidden();
+  await away(page,90*60_000+1000);await expect(page.locator('#lock')).toBeVisible();await expect(page.locator('#pkUnlock')).toBeVisible();
   await page.locator('#pkUnlock').click();await expect(page.locator('#lock')).toBeHidden();
   // 改主密码：所有 Face ID 作废，按钮不再出现，新主密码照常解锁
   const rotated='Pk-rotated-918';

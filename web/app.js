@@ -1030,8 +1030,8 @@ async function refreshPasskeys() {
   });
 }
 
-// 页面没被系统杀掉时，离开超过 5 分钟回来就锁。只在回来时判断：iOS 挂起页面后计时器不可靠
-const IDLE_LOCK_MS = 5 * 60 * 1000;
+// 页面没被系统杀掉时，离开超过 90 分钟回来就锁。只在回来时判断：iOS 挂起页面后计时器不可靠
+const IDLE_LOCK_MS = 90 * 60 * 1000;
 let hiddenAt = 0;
 const leave = () => { hiddenAt ||= Date.now(); };
 function back() {
