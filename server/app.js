@@ -51,6 +51,12 @@ export async function createApp(store, { origin = 'http://127.0.0.1:3000', produ
   app.post('/api/login',async (req,res) => res.json(await auth.login(req,res,v.parse(v.login,req.body))));
   app.post('/api/passkey/login/options',async (_req,res) => res.json(await passkeys.loginOptions()));
   app.post('/api/passkey/login',async (req,res) => res.json(await passkeys.login(req,res,req.body)));
+  app.get('/api/password-history',(_req,res) => res.json({ items: store.listPasswordHistory() }));
+  app.post('/api/password-history',(req,res) => {
+    const data = v.parse(v.passwordHistoryEntry, req.body);
+    res.json({ items: store.addPasswordHistory(data.password) });
+  });
+  app.delete('/api/password-history',(_req,res) => res.json({ items: store.clearPasswordHistory() }));
   app.use('/api',(req,_res,next) => {
     const session = auth.session(req);
     if (!session) throw new v.HttpError(401,'请重新登录');

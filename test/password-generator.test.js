@@ -4,6 +4,7 @@ import {
   CHARSETS,
   LIMITS,
   WORDLIST,
+  HISTORY_LIMIT,
   clampInt,
   randomInt,
   generateRandomPassword,
@@ -11,6 +12,10 @@ import {
   generatePin,
   estimateStrength,
   tokenizePassword,
+  normalizeHistoryItems,
+  upsertHistoryItem,
+  formatHistoryTime,
+  formatFullHistoryTime,
 } from '../web/password-generator.js';
 
 test('WORDLIST contains unique lowercase ASCII words', () => {
@@ -110,4 +115,44 @@ test('clampInt, randomInt, strength estimator, and tokenizer behave as expected'
   const memTokens = tokenizePassword('Acorn-River', 'memorable', '-');
   assert.equal(memTokens[5].cls, 'ch-sep');
   assert.equal(memTokens[0].cls, 'ch-alpha');
+});
+
+test('password history helpers normalize, deduplicate, cap to 50, and format timestamps', () => {
+  assert.equal(HISTORY_LIMIT, 50);
+  assert.deepEqual(normalizeHistoryItems(null), []);
+  assert.deepEqual(normalizeHistoryItems('invalid'), []);
+
+  const normalized = normalizeHistoryItems([
+    { id: 1, password: 'old', copied_at: 1000 },
+    { id: 2, password: '', copied_at: 2000 },
+    { id: 3, password: 'bad-ts', copied_at: 'nope' },
+    { id: 4, password: 'newest', copied_at: 3000 },
+    { id: 5, password: 'old', copied_at: 2500 },
+  ]);
+  assert.deepEqual(normalized.map(i => [i.password, i.copied_at]), [
+    ['newest', 3000],
+    ['old', 2500],
+  ]);
+
+  let items = [];
+  for (let i = 1; i <= 55; i++) {
+    items = upsertHistoryItem(items, `pw-${i}`, 1000 + i);
+  }
+  assert.equal(items.length, 50);
+  assert.equal(items[0].password, 'pw-55');
+  assert.equal(items[49].password, 'pw-6');
+
+  const rebumped = upsertHistoryItem(items, 'pw-10', 9999);
+  assert.equal(rebumped.length, 50);
+  assert.equal(rebumped[0].password, 'pw-10');
+  assert.equal(rebumped[0].copied_at, 9999);
+  assert.equal(rebumped.filter(i => i.password === 'pw-10').length, 1);
+
+  const sameYearRef = new Date(2026, 10, 22, 15, 0, 0).getTime();
+  const sampleTs = new Date(2026, 2, 5, 9, 4, 7).getTime();
+  const prevYearTs = new Date(2025, 11, 31, 23, 59, 58).getTime();
+  assert.equal(formatHistoryTime(sampleTs, sameYearRef), '03-05 09:04:07');
+  assert.equal(formatHistoryTime(prevYearTs, sameYearRef), '2025-12-31 23:59:58');
+  assert.equal(formatFullHistoryTime(sampleTs), '2026-03-05 09:04:07');
+  assert.equal(formatHistoryTime(Number.NaN, sameYearRef), '');
 });

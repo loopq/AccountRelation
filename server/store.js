@@ -7,6 +7,7 @@ import { HttpError } from './validation.js';
 const accountColumns = ['category', 'platform_id', 'name', 'encrypted_password', 'encrypted_2fa',
   'phone', 'twofa_enabled', 'passkey_enabled', 'country_id', 'register_email_id', 'subscribe_apple_id', 'note', 'recovery_email',
   'claude_status', 'claude_registered_at', 'claude_active_at', 'claude_banned_at'];
+const PASSWORD_HISTORY_LIMIT = 50;
 const now = () => new Date().toISOString();
 
 export function openStore(filename) {
@@ -18,7 +19,7 @@ export function openStore(filename) {
   db.pragma('busy_timeout = 5000');
   db.pragma('synchronous = FULL');
   const version = db.pragma('user_version', { simple: true });
-  if (version > 5) throw new Error('Database schema is newer than this server');
+  if (version > 6) throw new Error('Database schema is newer than this server');
   if (version === 0) db.transaction(() => {
     db.exec(`
       CREATE TABLE platforms (id TEXT PRIMARY KEY, category TEXT NOT NULL CHECK(category IN ('email','apple','ai')),
@@ -83,6 +84,17 @@ export function openStore(filename) {
       ALTER TABLE accounts ADD COLUMN claude_active_at TEXT;
       ALTER TABLE accounts ADD COLUMN claude_banned_at TEXT;
       PRAGMA user_version=5;
+    `);
+  })();
+  if (version < 6) db.transaction(() => {
+    db.exec(`
+      CREATE TABLE password_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        password TEXT NOT NULL,
+        copied_at INTEGER NOT NULL
+      );
+      CREATE INDEX password_history_copied_at ON password_history(copied_at DESC, id DESC);
+      PRAGMA user_version=6;
     `);
   })();
 
@@ -212,5 +224,24 @@ export function openStore(filename) {
     // 旧 passkey 包的是旧 key，同一事务里作废，不留「包裹过期」的中间态
     db.prepare('DELETE FROM passkeys').run();
   }
-  return { db, snapshot, mutate, saveAccount, deleteAccount, saveLookup, deleteLookup, initVault, rotate };
+  function listPasswordHistory() {
+    return db.prepare(
+      'SELECT id,password,copied_at FROM password_history ORDER BY copied_at DESC,id DESC LIMIT ?'
+    ).all(PASSWORD_HISTORY_LIMIT);
+  }
+  function addPasswordHistory(password, copiedAt = Date.now()) {
+    return db.transaction(() => {
+      db.prepare('DELETE FROM password_history WHERE password=?').run(password);
+      db.prepare('INSERT INTO password_history (password,copied_at) VALUES (?,?)').run(password, copiedAt);
+      db.prepare(
+        'DELETE FROM password_history WHERE id NOT IN (SELECT id FROM password_history ORDER BY copied_at DESC,id DESC LIMIT ?)'
+      ).run(PASSWORD_HISTORY_LIMIT);
+      return listPasswordHistory();
+    }).immediate();
+  }
+  function clearPasswordHistory() {
+    db.prepare('DELETE FROM password_history').run();
+    return [];
+  }
+  return { db, snapshot, mutate, saveAccount, deleteAccount, saveLookup, deleteLookup, initVault, rotate, listPasswordHistory, addPasswordHistory, clearPasswordHistory };
 }

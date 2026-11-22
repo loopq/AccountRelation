@@ -164,7 +164,7 @@ test('empty-vault rotation and racing initialization',async t=>{
 
 test('devices CRUD, account device links, schema v2 and foreign keys',async t=>{
   const f=await fixture(t);await f.login();await f.initialize();
-  assert.equal(f.store.db.pragma('user_version',{simple:true}),5);
+  assert.equal(f.store.db.pragma('user_version',{simple:true}),6);
   const initialSnap=f.store.snapshot();
   assert.ok(Array.isArray(initialSnap.devices));assert.equal(initialSnap.devices.length,0);
   const addDev1=await f.change('/api/devices','POST',{name:'MacBook Pro',sort:1});
@@ -275,21 +275,22 @@ test('passkey boundaries: options gating, auth, revocation on rotate/reset, no s
   assert.equal(f.store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
 });
 
-test('schema v2 database migrates to v5 without touching existing rows',t=>{
+test('schema v2 database migrates to v6 without touching existing rows',t=>{
   const dir=mkdtempSync(join(tmpdir(),'account-migrate-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const file=join(dir,'account.db');
   let store=openStore(file);
   const before=store.snapshot();
-  store.db.exec('ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; ALTER TABLE accounts DROP COLUMN passkey_enabled; DROP TABLE passkeys; PRAGMA user_version=2;');store.db.close();
+  store.db.exec('DROP TABLE password_history; ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; ALTER TABLE accounts DROP COLUMN passkey_enabled; DROP TABLE passkeys; PRAGMA user_version=2;');store.db.close();
   store=openStore(file);
-  assert.equal(store.db.pragma('user_version',{simple:true}),5);
+  assert.equal(store.db.pragma('user_version',{simple:true}),6);
   assert.deepEqual(store.snapshot(),before);
   assert.equal(store.db.prepare('SELECT count(*) n FROM passkeys').get().n,0);
-  store.db.exec('PRAGMA user_version=6;');store.db.close();
+  assert.equal(store.db.prepare('SELECT count(*) n FROM password_history').get().n,0);
+  store.db.exec('PRAGMA user_version=7;');store.db.close();
   assert.throws(()=>openStore(file),/newer than this server/);
 });
 
-test('schema v3 database migrates to v5 preserving accounts and device links',t=>{
+test('schema v3 database migrates to v6 preserving accounts and device links',t=>{
   const dir=mkdtempSync(join(tmpdir(),'account-migrate-v3-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const file=join(dir,'account.db');
   let store=openStore(file);
@@ -300,9 +301,9 @@ test('schema v3 database migrates to v5 preserving accounts and device links',t=
   store.db.prepare('INSERT INTO devices (id,name,created_at) VALUES (?,?,?)').run(deviceId,'Legacy Device',timestamp);
   store.db.prepare('INSERT INTO account_devices (account_id,device_id) VALUES (?,?)').run(id,deviceId);
   const before=store.snapshot();
-  store.db.exec('ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; ALTER TABLE accounts DROP COLUMN passkey_enabled; PRAGMA user_version=3;');store.db.close();
+  store.db.exec('DROP TABLE password_history; ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; ALTER TABLE accounts DROP COLUMN passkey_enabled; PRAGMA user_version=3;');store.db.close();
   store=openStore(file);
-  assert.equal(store.db.pragma('user_version',{simple:true}),5);
+  assert.equal(store.db.pragma('user_version',{simple:true}),6);
   assert.deepEqual(store.snapshot(),before);
   const migrated=store.snapshot().accounts.find(a=>a.id===id);
   assert.equal(migrated.passkey_enabled,false);assert.equal(migrated.twofa_enabled,true);
@@ -312,7 +313,7 @@ test('schema v3 database migrates to v5 preserving accounts and device links',t=
   store.db.close();
 });
 
-test('schema v4 database migrates to v5 preserving accounts, passkey flag and device links',t=>{
+test('schema v4 database migrates to v6 preserving accounts, passkey flag and device links',t=>{
   const dir=mkdtempSync(join(tmpdir(),'account-migrate-v4-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
   const file=join(dir,'account.db');
   let store=openStore(file);
@@ -323,9 +324,9 @@ test('schema v4 database migrates to v5 preserving accounts, passkey flag and de
   store.db.prepare('INSERT INTO devices (id,name,created_at) VALUES (?,?,?)').run(deviceId,'Claude Legacy Device',timestamp);
   store.db.prepare('INSERT INTO account_devices (account_id,device_id) VALUES (?,?)').run(id,deviceId);
   const before=store.snapshot();
-  store.db.exec('ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; PRAGMA user_version=4;');store.db.close();
+  store.db.exec('DROP TABLE password_history; ALTER TABLE accounts DROP COLUMN claude_status; ALTER TABLE accounts DROP COLUMN claude_registered_at; ALTER TABLE accounts DROP COLUMN claude_active_at; ALTER TABLE accounts DROP COLUMN claude_banned_at; PRAGMA user_version=4;');store.db.close();
   store=openStore(file);
-  assert.equal(store.db.pragma('user_version',{simple:true}),5);
+  assert.equal(store.db.pragma('user_version',{simple:true}),6);
   assert.deepEqual(store.snapshot(),before);
   const migrated=store.snapshot().accounts.find(a=>a.id===id);
   assert.equal(migrated.passkey_enabled,true);assert.equal(migrated.twofa_enabled,true);
@@ -335,6 +336,78 @@ test('schema v4 database migrates to v5 preserving accounts, passkey flag and de
   assert.equal(store.db.pragma('integrity_check',{simple:true}),'ok');
   assert.equal(store.db.pragma('foreign_key_check').length,0);
   store.db.close();
+});
+
+test('schema v5 database migrates to v6 preserving accounts, claude status, passkey flag and device links',t=>{
+  const dir=mkdtempSync(join(tmpdir(),'account-migrate-v5-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));
+  const file=join(dir,'account.db');
+  let store=openStore(file);
+  const platform=store.db.prepare("SELECT id FROM platforms WHERE category='email' LIMIT 1").get();
+  const id=randomUUID(),deviceId=randomUUID(),timestamp=new Date().toISOString();
+  store.db.prepare('INSERT INTO accounts (id,category,platform_id,name,twofa_enabled,passkey_enabled,claude_status,claude_active_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(id,'email',platform.id,'v5@example.test',1,1,'active','2026-03-05',timestamp,timestamp);
+  store.db.prepare('INSERT INTO devices (id,name,created_at) VALUES (?,?,?)').run(deviceId,'V5 Device',timestamp);
+  store.db.prepare('INSERT INTO account_devices (account_id,device_id) VALUES (?,?)').run(id,deviceId);
+  const before=store.snapshot();
+  store.db.exec('DROP TABLE password_history; PRAGMA user_version=5;');store.db.close();
+  store=openStore(file);
+  assert.equal(store.db.pragma('user_version',{simple:true}),6);
+  assert.deepEqual(store.snapshot(),before);
+  assert.deepEqual(store.listPasswordHistory(),[]);
+  const migrated=store.snapshot().accounts.find(a=>a.id===id);
+  assert.equal(migrated.claude_status,'active');assert.equal(migrated.claude_active_at,'2026-03-05');
+  assert.equal(store.db.pragma('integrity_check',{simple:true}),'ok');
+  assert.equal(store.db.pragma('foreign_key_check').length,0);
+  store.db.close();
+});
+
+test('password history API works without login, enforces origin/validation, deduplicates and caps at 50',async t=>{
+  const f=await fixture(t);
+  const initial=await f.call('/api/password-history');
+  assert.equal(initial.status,200);
+  assert.equal(initial.headers.get('cache-control'),'no-store');
+  assert.deepEqual(initial.data,{items:[]});
+
+  assert.equal((await f.call('/api/password-history','POST',{password:'abc'},{Origin:'https://evil.test'})).status,403);
+  assert.equal((await f.call('/api/password-history','POST',{password:'abc'},{'Sec-Fetch-Site':'cross-site'})).status,403);
+  assert.equal((await f.call('/api/password-history','POST',{password:''})).status,400);
+  assert.equal((await f.call('/api/password-history','POST',{password:'x'.repeat(513)})).status,400);
+  assert.equal((await f.call('/api/password-history','POST',{password:'ok',extra:true})).status,400);
+
+  const exactPw='  Alpha-123! <tag>&"  ';
+  const r1=await f.call('/api/password-history','POST',{password:exactPw});
+  assert.equal(r1.status,200);
+  assert.equal(r1.data.items.length,1);
+  assert.equal(r1.data.items[0].password,exactPw);
+  assert.equal(typeof r1.data.items[0].copied_at,'number');
+
+  for(let i=1;i<=52;i++){
+    const res=await f.call('/api/password-history','POST',{password:`SyncPw#${i}`});
+    assert.equal(res.status,200);
+  }
+  const listed=await f.call('/api/password-history');
+  assert.equal(listed.status,200);
+  assert.equal(listed.data.items.length,50);
+  assert.equal(listed.data.items[0].password,'SyncPw#52');
+  assert.equal(listed.data.items[49].password,'SyncPw#3');
+
+  // 重复写入已存在密码应去重并置顶
+  const bumped=await f.call('/api/password-history','POST',{password:'SyncPw#10'});
+  assert.equal(bumped.status,200);
+  assert.equal(bumped.data.items.length,50);
+  assert.equal(bumped.data.items[0].password,'SyncPw#10');
+  assert.equal(bumped.data.items.filter(i=>i.password==='SyncPw#10').length,1);
+
+  // 不泄漏到保险库快照 /api/state
+  await f.login();
+  assert.doesNotMatch(JSON.stringify((await f.call('/api/state')).data),/SyncPw#10/);
+
+  // 清空同样支持免登录且检查同源
+  assert.equal((await f.call('/api/password-history','DELETE',{},{Origin:'https://evil.test'})).status,403);
+  const cleared=await f.call('/api/password-history','DELETE',{},{Cookie:'', 'X-CSRF-Token':''});
+  assert.equal(cleared.status,200);
+  assert.deepEqual(cleared.data,{items:[]});
+  assert.deepEqual((await f.call('/api/password-history','GET',undefined,{Cookie:''})).data,{items:[]});
 });
 
 test('email account claude status: dates kept across status changes, cleared on fresh/category change, rejected on non-email',async t=>{

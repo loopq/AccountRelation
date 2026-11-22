@@ -35,6 +35,7 @@ export const initVault = z.strictObject({ salt, canary: cipher });
 export const rotation = z.strictObject({ salt, canary: cipher,
   updates: z.array(z.strictObject({ id: uuid, ct: cipher.optional(), fa: cipher.optional() })).max(10000) });
 export const login = z.strictObject({ email: z.email().max(320).transform(s => s.toLowerCase()), password: z.string().min(1).max(1024) });
+export const passwordHistoryEntry = z.strictObject({ password: z.string().min(1).max(512) });
 export function parse(schema, data) {
   const result = schema.safeParse(data);
   if (!result.success) throw new HttpError(400, '请求字段或格式不正确');

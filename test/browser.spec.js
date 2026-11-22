@@ -297,12 +297,15 @@ test('Face ID passkey: one gesture logs in and unlocks; replay, idle lock, rotat
   expect(errors).toEqual([]);
 });
 
-test('public password generator works without login on desktop and mobile portrait', async ({ page, context }) => {
+test('public password generator works without login on desktop and mobile portrait', async ({ page, context, browser }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
   const errors = [];
   const apiRequests = [];
   page.on('pageerror', e => errors.push(e.message));
-  page.on('request', r => { if (new URL(r.url()).pathname.startsWith('/api/')) apiRequests.push(r.url()); });
+  page.on('request', r => {
+    const p = new URL(r.url()).pathname;
+    if (p.startsWith('/api/')) apiRequests.push(p);
+  });
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto('/');
@@ -350,11 +353,45 @@ test('public password generator works without login on desktop and mobile portra
   const pin = await page.locator('#pwText').textContent();
   expect(pin).toMatch(/^\d{6}$/);
 
-  // 切回随机模式并测试复制按钮反馈
+  // 切回随机模式并测试复制按钮反馈 + 自动记录到云端密码历史
   await page.locator('.seg-tab[data-mode="random"]').click();
+  const firstCopied = await page.locator('#pwText').textContent();
+  const post1 = page.waitForResponse(r => r.url().endsWith('/api/password-history') && r.request().method() === 'POST' && r.status() === 200);
   await page.locator('#copyBtn').click();
+  await post1;
   await expect(page.locator('#copyBtnText')).toHaveText('已复制');
   await expect(page.locator('#toast')).toContainText('密码已复制到剪贴板');
+  await expect(page.locator('#historyCount')).toHaveText('1');
+
+  // 再生成并复制第二条，验证最新在最上方
+  await page.locator('#refreshBtn').click();
+  const secondCopied = await page.locator('#pwText').textContent();
+  expect(secondCopied).not.toBe(firstCopied);
+  const post2 = page.waitForResponse(r => r.url().endsWith('/api/password-history') && r.request().method() === 'POST' && r.status() === 200);
+  await page.locator('#pwOutput').click();
+  await post2;
+  await expect(page.locator('#historyCount')).toHaveText('2');
+
+  // 跨设备同步验证：新开完全隔离的浏览器上下文（模拟另一台未登录设备）
+  const deviceB = await browser.newContext();
+  await deviceB.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+  const pageB = await deviceB.newPage();
+  const errorsB = [];
+  pageB.on('pageerror', e => errorsB.push(e.message));
+  await pageB.goto('/password-generator');
+  await expect(pageB.locator('#historyCount')).toHaveText('2');
+  await pageB.locator('#historyBtn').click();
+  await expect(pageB.locator('#historyView')).toBeVisible();
+  await expect(pageB.locator('#historyList .hist-item')).toHaveCount(2);
+  await expect(pageB.locator('#historyList .hist-item').nth(0).locator('.hist-pw')).toHaveText(secondCopied);
+  await expect(pageB.locator('#historyList .hist-item').nth(1).locator('.hist-pw')).toHaveText(firstCopied);
+  await expect(pageB.locator('#historyList .hist-item').nth(0).locator('.hist-time')).toHaveText(/\d{2}-\d{2} \d{2}:\d{2}:\d{2}/);
+
+  // 点击历史右侧复制按钮：应有已复制反馈且不重复新增历史
+  await pageB.locator('#historyList .hist-item').nth(1).locator('.hist-copy-btn').click();
+  await expect(pageB.locator('#historyList .hist-item').nth(1).locator('.hist-copy-btn')).toContainText('已复制');
+  await expect(pageB.locator('#toast')).toContainText('已从历史复制密码');
+  await expect(pageB.locator('#historyList .hist-item')).toHaveCount(2);
 
   // 切换明暗主题
   const beforeTheme = await page.locator('html').getAttribute('data-theme');
@@ -362,7 +399,7 @@ test('public password generator works without login on desktop and mobile portra
   const afterTheme = await page.locator('html').getAttribute('data-theme');
   expect(afterTheme).not.toBe(beforeTheme);
 
-  // 手机竖屏适配检查（无横向溢出，卡片完整在视口内）
+  // 手机竖屏适配检查（主界面 + 历史界面均无横向溢出，卡片完整在视口内）
   for (const vp of [{ width: 390, height: 844 }, { width: 360, height: 740 }]) {
     await page.setViewportSize(vp);
     const metrics = await page.evaluate(() => {
@@ -380,8 +417,41 @@ test('public password generator works without login on desktop and mobile portra
     expect(metrics.cardLeft).toBeGreaterThanOrEqual(0);
     expect(metrics.cardRight).toBeLessThanOrEqual(metrics.innerWidth + 1);
     expect(metrics.lblHeight).toBeLessThan(32);
+
+    await page.locator('#historyBtn').click();
+    await expect(page.locator('#historyView')).toBeVisible();
+    const histMetrics = await page.evaluate(() => {
+      const card = document.querySelector('.gen-card').getBoundingClientRect();
+      return {
+        overflowX: document.documentElement.scrollWidth > window.innerWidth,
+        cardLeft: card.left,
+        cardRight: card.right,
+        innerWidth: window.innerWidth,
+      };
+    });
+    expect(histMetrics.overflowX).toBe(false);
+    expect(histMetrics.cardLeft).toBeGreaterThanOrEqual(0);
+    expect(histMetrics.cardRight).toBeLessThanOrEqual(histMetrics.innerWidth + 1);
+    await page.locator('#historyBackBtn').click();
+    await expect(page.locator('#generatorView')).toBeVisible();
   }
 
-  expect(apiRequests).toEqual([]);
+  // 二次点击清空历史并验证跨设备同步清空
+  await page.locator('#historyBtn').click();
+  await page.locator('#historyClearBtn').click();
+  await expect(page.locator('#historyClearText')).toHaveText('确认清空？');
+  const delReq = page.waitForResponse(r => r.url().endsWith('/api/password-history') && r.request().method() === 'DELETE' && r.status() === 200);
+  await page.locator('#historyClearBtn').click();
+  await delReq;
+  await expect(page.locator('#historyEmpty')).toBeVisible();
+  await expect(page.locator('#historyCount')).toBeHidden();
+
+  await pageB.reload();
+  await pageB.locator('#historyBtn').click();
+  await expect(pageB.locator('#historyEmpty')).toBeVisible();
+  await deviceB.close();
+
+  expect(apiRequests.every(p => p === '/api/password-history')).toBe(true);
   expect(errors).toEqual([]);
+  expect(errorsB).toEqual([]);
 });

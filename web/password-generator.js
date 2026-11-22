@@ -12,6 +12,9 @@ export const LIMITS = {
 };
 
 export const SEPARATORS = ['-', ' ', '.', '_'];
+export const HISTORY_LIMIT = 50;
+const HISTORY_ENDPOINT = '/api/password-history';
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 // 本地内置常见易拼写英文词表（纯离线，不发起任何网络请求）
 export const WORDLIST = [
@@ -298,6 +301,74 @@ export function tokenizePassword(password, mode = 'random', separator = '-') {
   return tokens;
 }
 
+export function normalizeHistoryItems(raw, limit = HISTORY_LIMIT) {
+  if (!Array.isArray(raw)) return [];
+  const cap = clampInt(limit, 1, 500, HISTORY_LIMIT);
+  const valid = [];
+  for (const item of raw) {
+    if (!item || typeof item.password !== 'string' || item.password.length === 0) continue;
+    const copiedAt = Number(item.copied_at ?? item.copiedAt);
+    if (!Number.isFinite(copiedAt) || copiedAt < 0) continue;
+    valid.push({
+      id: item.id ?? null,
+      password: item.password,
+      copied_at: Math.trunc(copiedAt),
+    });
+  }
+  valid.sort((a, b) => (b.copied_at - a.copied_at) || (Number(b.id || 0) - Number(a.id || 0)));
+  const seen = new Set();
+  const deduped = [];
+  for (const item of valid) {
+    if (seen.has(item.password)) continue;
+    seen.add(item.password);
+    deduped.push(item);
+    if (deduped.length >= cap) break;
+  }
+  return deduped;
+}
+
+export function upsertHistoryItem(items, password, copiedAt = Date.now(), limit = HISTORY_LIMIT) {
+  if (typeof password !== 'string' || password.length === 0) {
+    return normalizeHistoryItems(items, limit);
+  }
+  const cap = clampInt(limit, 1, 500, HISTORY_LIMIT);
+  const ts = Number.isFinite(Number(copiedAt)) ? Math.trunc(Number(copiedAt)) : Date.now();
+  const rest = normalizeHistoryItems(items, cap).filter(item => item.password !== password);
+  return [{ id: null, password, copied_at: ts }, ...rest].slice(0, cap);
+}
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+export function formatFullHistoryTime(timestamp) {
+  const d = new Date(timestamp);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+export function formatHistoryTime(timestamp, now = Date.now()) {
+  const d = new Date(timestamp);
+  const ref = new Date(now);
+  if (Number.isNaN(d.getTime())) return '';
+  const timePart = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  const mdPart = `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  if (!Number.isNaN(ref.getTime()) && d.getFullYear() === ref.getFullYear()) {
+    return `${mdPart} ${timePart}`;
+  }
+  return `${d.getFullYear()}-${mdPart} ${timePart}`;
+}
+
+function createIcon(doc, href) {
+  const svg = doc.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'ic');
+  svg.setAttribute('aria-hidden', 'true');
+  const use = doc.createElementNS(SVG_NS, 'use');
+  use.setAttribute('href', href);
+  svg.appendChild(use);
+  return { svg, use };
+}
+
 async function copyText(text, doc) {
   if (navigator.clipboard?.writeText) {
     try {
@@ -348,17 +419,198 @@ export function initPasswordGenerator(doc = document) {
   const refreshBtn = doc.getElementById('refreshBtn');
   const themeToggle = doc.getElementById('themeToggle');
   const toastEl = doc.getElementById('toast');
+  const generatorView = doc.getElementById('generatorView');
+  const historyView = doc.getElementById('historyView');
+  const historyBtn = doc.getElementById('historyBtn');
+  const historyCount = doc.getElementById('historyCount');
+  const historyBackBtn = doc.getElementById('historyBackBtn');
+  const historyMeta = doc.getElementById('historyMeta');
+  const historyClearBtn = doc.getElementById('historyClearBtn');
+  const historyClearText = doc.getElementById('historyClearText');
+  const historyError = doc.getElementById('historyError');
+  const historyErrorText = doc.getElementById('historyErrorText');
+  const historyRetryBtn = doc.getElementById('historyRetryBtn');
+  const historyLoading = doc.getElementById('historyLoading');
+  const historyEmpty = doc.getElementById('historyEmpty');
+  const historyList = doc.getElementById('historyList');
 
   let toastTimer = null;
   let copyTimer = null;
   let pulseTimer = null;
   let spinTimer = null;
+  let clearConfirmTimer = null;
+  let clearConfirming = false;
+  let historyOpen = false;
+  let historyLoaded = false;
+  let historyFetching = false;
+  let historyErrorMsg = '';
+  let historyItems = [];
+  let syncEpoch = 0;
+  let writeQueue = Promise.resolve();
 
   function showToast(msg) {
     toastEl.textContent = msg;
     toastEl.classList.add('show');
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+  }
+
+  function resetClearConfirm() {
+    clearConfirming = false;
+    clearTimeout(clearConfirmTimer);
+    historyClearBtn.classList.remove('confirming');
+    historyClearText.textContent = '清空';
+  }
+
+  function renderHistory() {
+    const count = historyItems.length;
+    historyCount.textContent = String(count);
+    historyCount.classList.toggle('hidden', count === 0);
+    historyMeta.textContent = `${count} / ${HISTORY_LIMIT}`;
+    historyClearBtn.disabled = count === 0;
+    if (count === 0) resetClearConfirm();
+
+    historyError.classList.toggle('hidden', !historyErrorMsg);
+    if (historyErrorMsg) historyErrorText.textContent = historyErrorMsg;
+
+    const showLoading = historyFetching && !historyLoaded && count === 0;
+    historyLoading.classList.toggle('hidden', !showLoading);
+    historyEmpty.classList.toggle('hidden', showLoading || count > 0);
+    historyList.classList.toggle('hidden', count === 0);
+
+    const frag = doc.createDocumentFragment();
+    const now = Date.now();
+    for (const item of historyItems) {
+      const li = doc.createElement('li');
+      li.className = 'hist-item';
+
+      const main = doc.createElement('div');
+      main.className = 'hist-main';
+
+      const pwEl = doc.createElement('div');
+      pwEl.className = 'hist-pw';
+      for (const token of tokenizePassword(item.password, 'random')) {
+        const span = doc.createElement('span');
+        span.className = token.cls;
+        span.textContent = token.ch;
+        pwEl.appendChild(span);
+      }
+
+      const timeEl = doc.createElement('div');
+      timeEl.className = 'hist-time';
+      timeEl.textContent = formatHistoryTime(item.copied_at, now);
+      timeEl.title = formatFullHistoryTime(item.copied_at);
+
+      main.appendChild(pwEl);
+      main.appendChild(timeEl);
+
+      const btn = doc.createElement('button');
+      btn.type = 'button';
+      btn.className = 'hist-copy-btn';
+      btn.setAttribute('aria-label', '复制此历史密码');
+      const { svg, use } = createIcon(doc, '#i-copy');
+      const label = doc.createElement('span');
+      label.textContent = '复制';
+      btn.appendChild(svg);
+      btn.appendChild(label);
+
+      let btnTimer = null;
+      btn.addEventListener('click', async () => {
+        const ok = await copyText(item.password, doc);
+        if (!ok) {
+          showToast('复制失败，请手动选中复制');
+          return;
+        }
+        btn.classList.add('copied');
+        use.setAttribute('href', '#i-check');
+        label.textContent = '已复制';
+        showToast('已从历史复制密码');
+        clearTimeout(btnTimer);
+        btnTimer = setTimeout(() => {
+          btn.classList.remove('copied');
+          use.setAttribute('href', '#i-copy');
+          label.textContent = '复制';
+        }, 1500);
+      });
+
+      li.appendChild(main);
+      li.appendChild(btn);
+      frag.appendChild(li);
+    }
+    historyList.replaceChildren(frag);
+  }
+
+  async function requestHistory(method, body) {
+    const opts = { method, cache: 'no-store' };
+    if (body !== undefined) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(HISTORY_ENDPOINT, opts);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return normalizeHistoryItems(data?.items, HISTORY_LIMIT);
+  }
+
+  async function fetchHistory({ silent = false } = {}) {
+    const reqEpoch = ++syncEpoch;
+    historyFetching = true;
+    if (!silent) historyErrorMsg = '';
+    renderHistory();
+    try {
+      await writeQueue;
+      if (reqEpoch !== syncEpoch) return;
+      const items = await requestHistory('GET');
+      if (reqEpoch !== syncEpoch) return;
+      historyItems = items;
+      historyLoaded = true;
+      historyErrorMsg = '';
+    } catch {
+      if (reqEpoch !== syncEpoch) return;
+      if (!silent) historyErrorMsg = '云端历史加载失败，请检查网络后重试';
+    } finally {
+      if (reqEpoch === syncEpoch) {
+        historyFetching = false;
+        renderHistory();
+      }
+    }
+  }
+
+  function enqueueRecordHistory(password) {
+    const copiedAt = Date.now();
+    const reqEpoch = ++syncEpoch;
+    historyItems = upsertHistoryItem(historyItems, password, copiedAt, HISTORY_LIMIT);
+    renderHistory();
+    writeQueue = writeQueue.then(async () => {
+      try {
+        const items = await requestHistory('POST', { password });
+        if (reqEpoch !== syncEpoch) return;
+        historyItems = items;
+        historyLoaded = true;
+        historyErrorMsg = '';
+        renderHistory();
+      } catch {
+        if (reqEpoch === syncEpoch) {
+          historyErrorMsg = '云端历史同步失败，请稍后重试';
+          renderHistory();
+        }
+        showToast('密码已复制，但云端历史同步失败');
+      }
+    });
+  }
+
+  function setHistoryOpen(open) {
+    historyOpen = open;
+    generatorView.classList.toggle('hidden', open);
+    historyView.classList.toggle('hidden', !open);
+    historyBtn.classList.toggle('active', open);
+    historyBtn.setAttribute('aria-expanded', String(open));
+    if (open) {
+      resetClearConfirm();
+      fetchHistory({ silent: false });
+    } else {
+      resetClearConfirm();
+    }
   }
 
   function updateRangeFill(input) {
@@ -455,8 +707,9 @@ export function initPasswordGenerator(doc = document) {
   }
 
   async function handleCopy() {
-    if (!state.current) return;
-    const ok = await copyText(state.current, doc);
+    const password = state.current;
+    if (!password) return;
+    const ok = await copyText(password, doc);
     if (!ok) {
       showToast('复制失败，请手动选中复制');
       return;
@@ -471,6 +724,7 @@ export function initPasswordGenerator(doc = document) {
       copyBtnIcon.setAttribute('href', '#i-copy');
       copyBtnText.textContent = '复制密码';
     }, 1600);
+    enqueueRecordHistory(password);
   }
 
   for (const tab of tabs) {
@@ -531,7 +785,60 @@ export function initPasswordGenerator(doc = document) {
     try { localStorage.setItem('ag_theme', next); } catch {}
   });
 
+  historyBtn.addEventListener('click', () => {
+    setHistoryOpen(!historyOpen);
+  });
+  historyBackBtn.addEventListener('click', () => {
+    setHistoryOpen(false);
+    historyBtn.focus();
+  });
+  historyRetryBtn.addEventListener('click', () => {
+    fetchHistory({ silent: false });
+  });
+  historyClearBtn.addEventListener('click', () => {
+    if (historyItems.length === 0) return;
+    if (!clearConfirming) {
+      clearConfirming = true;
+      historyClearBtn.classList.add('confirming');
+      historyClearText.textContent = '确认清空？';
+      clearTimeout(clearConfirmTimer);
+      clearConfirmTimer = setTimeout(resetClearConfirm, 3500);
+      return;
+    }
+    resetClearConfirm();
+    const reqEpoch = ++syncEpoch;
+    writeQueue = writeQueue.then(async () => {
+      try {
+        const items = await requestHistory('DELETE', {});
+        if (reqEpoch !== syncEpoch) return;
+        historyItems = items;
+        historyLoaded = true;
+        historyErrorMsg = '';
+        renderHistory();
+        showToast('已清空密码历史');
+      } catch {
+        if (reqEpoch === syncEpoch) {
+          historyErrorMsg = '清空失败，请稍后重试';
+          renderHistory();
+        }
+        showToast('清空历史失败');
+      }
+    });
+  });
+
+  doc.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && historyOpen) {
+      setHistoryOpen(false);
+      historyBtn.focus();
+    }
+  });
+  doc.addEventListener('visibilitychange', () => {
+    if (!doc.hidden && historyOpen) fetchHistory({ silent: false });
+  });
+
   renderPassword(false);
+  renderHistory();
+  fetchHistory({ silent: true });
 }
 
 if (typeof document !== 'undefined') {
